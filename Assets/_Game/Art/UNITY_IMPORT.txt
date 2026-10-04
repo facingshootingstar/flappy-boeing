@@ -1,0 +1,39 @@
+Flappy Poeing sprite import. Do not change the file names.
+
+Every gameplay sprite is a transparent PNG at the manifest pixel size.
+Background skies are opaque. Cloud, rain, wave, and spray layers are transparent.
+
+Importer
+- Filter Mode: Point
+- Compression: None
+- Pixels Per Unit: 32
+- Pivot: center for the player, birds, bullets, bosses, and backgrounds
+- Extrude Edges: 1
+
+Sheets, left to right, no gutters
+- player/poeing_fly_sheet.png      4 frames of 64x32
+- player/poeing_climb_sheet.png    2 frames of 64x32
+- player/poeing_dive_sheet.png     2 frames of 64x32
+- birds/bird_cruise_sheet.png      4 frames of 32x32
+- birds/bird_dive_sheet.png        2 frames of 32x32
+- bosses/eagle_flap_sheet.png      3 frames of 128x96
+- bosses/citadel_gun_sheet.png     2 frames of 48x32
+- fx/exhaust_puff_sheet.png        4 frames of 16x16
+- fx/hit_spark_sheet.png           4 frames of 16x16
+- ui/digits_sheet.png              10 glyphs of 16x24, "0" through "9"
+
+Animation sample rates: fly 8 fps, bird 6 fps, exhaust 12 fps.
+
+Sorting
+- sky 0, far clouds 1, mid clouds 2, pillars or waves 3
+- gameplay 10, fx 20, ui 100
+
+Biome swaps at score 30 and 70. Boss prefabs at 30, 70, and 120.
+Tile on X: dawn_clouds_far, dawn_clouds_mid, dawn_pillars, storm_clouds, storm_rain, sea_horizon, sea_waves, sea_spray.
+Do not tile dawn_sky, storm_sky, or sea_sky.
+
+bg/storm_lightning.png and fx/lightning_bolt.png are the same 32x96 bolt. Use one.
+
+Player Rigidbody2D with a CapsuleCollider2D on the fuselage only.
+The sprite is larger than the capsule on purpose.
+The projectile cap stays in the pooler, not in the art.

@@ -1,0 +1,57 @@
+== masters: 5 images
+  bosses\eagle_flap_sheet__f0.png: cached
+  bosses\ironwake_idle__f0.png: cached
+  bosses\citadel__f0.png: cached
+  bosses\citadel_gun_sheet__f0.png: cached
+  bosses\citadel_core_sheet__f0.png: ok
+== derived: 9 images
+  bosses\eagle_dive__f0.png: cached
+  bosses\ironwake_fire__f0.png: cached
+  bosses\eagle_storm_sheet__f0.png: ok
+  bosses\eagle_fury_sheet__f0.png: ok
+  bosses\eagle_ko__f0.png: ok
+  bosses\ironwake_damaged__f0.png: ok
+  bosses\ironwake_maw__f0.png: ok
+  bosses\ironwake_maw_open__f0.png: missing reference ironwake_maw__f0.png
+  bosses\citadel_cracked__f0.png: ok
+== frames: 8 images
+  bosses\eagle_flap_sheet__f1.png: cached
+  bosses\eagle_flap_sheet__f2.png: cached
+  bosses\citadel_gun_sheet__f1.png: cached
+  bosses\eagle_storm_sheet__f1.png: ok
+  bosses\eagle_storm_sheet__f2.png: ok
+  bosses\eagle_fury_sheet__f1.png: ok
+  bosses\eagle_fury_sheet__f2.png: ok
+  bosses\citadel_core_sheet__f1.png: ok
+== masters: 4 images
+  minions\storm_cloud_sheet__f0.png: ok
+  minions\turret__f0.png: ok
+  minions\mine__f0.png: ok
+  minions\torpedo__f0.png: ok
+== frames: 1 images
+  minions\storm_cloud_sheet__f1.png: ok
+== masters: 5 images
+  bosses\eagle_flap_sheet__f0.png: cached
+  bosses\ironwake_idle__f0.png: cached
+  bosses\citadel__f0.png: cached
+  bosses\citadel_gun_sheet__f0.png: cached
+  bosses\citadel_core_sheet__f0.png: cached
+== derived: 9 images
+  bosses\eagle_dive__f0.png: cached
+  bosses\ironwake_fire__f0.png: cached
+  bosses\eagle_storm_sheet__f0.png: cached
+  bosses\eagle_fury_sheet__f0.png: cached
+  bosses\eagle_ko__f0.png: cached
+  bosses\ironwake_damaged__f0.png: cached
+  bosses\ironwake_maw__f0.png: cached
+  bosses\ironwake_maw_open__f0.png: ok
+  bosses\citadel_cracked__f0.png: cached
+== frames: 8 images
+  bosses\eagle_flap_sheet__f1.png: cached
+  bosses\eagle_flap_sheet__f2.png: cached
+  bosses\citadel_gun_sheet__f1.png: cached
+  bosses\eagle_storm_sheet__f1.png: cached
+  bosses\eagle_storm_sheet__f2.png: cached
+  bosses\eagle_fury_sheet__f1.png: cached
+  bosses\eagle_fury_sheet__f2.png: cached
+  bosses\citadel_core_sheet__f1.png: cached
