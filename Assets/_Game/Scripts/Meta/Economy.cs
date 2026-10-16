@@ -16,7 +16,7 @@ public static class Economy
         }
         else if (r.gameId == "bossrush")
         {
-            coins = (r.won ? 20 : 0) + (r.score / 10);
+            coins = (r.won ? 20 : 0) + r.score * 3; // score = boss phases cleared (0..9)
         }
         else
         {
@@ -34,7 +34,8 @@ public static class Economy
     public static int XpFor(RunResult r)
     {
         if (r == null) return 0;
-        return Mathf.Max(1, r.score / 3) + (r.won ? 25 : 0);
+        int baseXp = r.gameId == "bossrush" ? r.score * 5 : r.score / 3;
+        return Mathf.Max(1, baseXp) + (r.won ? 25 : 0);
     }
 
     public static int PilotLevel(int xp)

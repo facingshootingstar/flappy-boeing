@@ -25,8 +25,16 @@ def session():
     return sid
 
 
+# tools outside the default "core" group; groups are per MCP session, so enable before each call
+GROUPS = {"execute_code": "scripting_ext", "manage_scriptable_object": "scripting_ext",
+          "run_tests": "testing", "get_test_job": "testing"}
+
+
 def call(tool, args):
     sid = session()
+    if tool in GROUPS:
+        post({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+            "name": "manage_tools", "arguments": {"action": "activate", "group": GROUPS[tool]}}}, sid)
     _, r = post({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": tool, "arguments": args}}, sid)
     return r
 

@@ -108,9 +108,20 @@ public class GameState : MonoBehaviour
 
     void GrantRun(bool won)
     {
-        string id = Combat ? "bossrush" : "flappy";
-        LastResult = Economy.Grant(RunResult.Create(id, Score, won, Time.timeSinceLevelLoad));
-        Debug.Log($"[Economy] {id} score={Score} won={won} +{LastResult.coinsEarned} coins (total {SaveSystem.Data.coins})");
+        float t = Time.timeSinceLevelLoad;
+        if (!Combat)
+        {
+            LastResult = Economy.Grant(RunResult.Create("flappy", Score, won, t));
+        }
+        else
+        {
+            // boss runs score by phases cleared (pipes don't count in combat); Classic also pays its Flappy leg
+            int phases = won ? BossCount * PhasesPerBoss : BossIndex * PhasesPerBoss + BossPhase;
+            int flappyCoins = Mode == RunMode.Classic ? Economy.Grant(RunResult.Create("flappy", Score, false, t)).coinsEarned : 0;
+            LastResult = Economy.Grant(RunResult.Create("bossrush", phases, won, t));
+            LastResult.coinsEarned += flappyCoins;
+        }
+        Debug.Log($"[Economy] {LastResult.gameId} score={LastResult.score} won={won} +{LastResult.coinsEarned} coins (total {SaveSystem.Data.coins})");
     }
 
     void RecordBest()
