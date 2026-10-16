@@ -90,6 +90,17 @@ public static class CombatInput
 #endif
     }
 
+    /// <summary>Temporary mode select on the title screen: 1 Classic, 2 Flappy, 3 Boss Rush. 0 = none.</summary>
+    public static int ModeKey()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var k = Keyboard.current; if (k == null) return 0;
+        return k.digit1Key.wasPressedThisFrame ? 1 : k.digit2Key.wasPressedThisFrame ? 2 : k.digit3Key.wasPressedThisFrame ? 3 : 0;
+#else
+        return Input.GetKeyDown(KeyCode.Alpha1) ? 1 : Input.GetKeyDown(KeyCode.Alpha2) ? 2 : Input.GetKeyDown(KeyCode.Alpha3) ? 3 : 0;
+#endif
+    }
+
     public static bool RestartPressed()
     {
 #if ENABLE_INPUT_SYSTEM

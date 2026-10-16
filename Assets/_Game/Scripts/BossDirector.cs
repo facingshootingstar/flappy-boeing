@@ -37,7 +37,7 @@ public class BossDirector : MonoBehaviour
     {
         foreach (var b in bosses) if (b) b.gameObject.SetActive(false);
         var gs = GameState.I;
-        if (gs != null && gs.FromCheckpoint)
+        if (gs != null && (gs.FromCheckpoint || GameState.Mode == RunMode.BossRush))
         {
             FilmFilter.IrisSet(0f);
             StopBirds();
@@ -50,7 +50,7 @@ public class BossDirector : MonoBehaviour
     void OnScore(int s)
     {
         var gs = GameState.I;
-        if (running || gs == null || gs.Combat || s < GameState.CombatScore) return;
+        if (running || gs == null || gs.Combat || s < GameState.CombatScore || GameState.Mode == RunMode.Flappy) return;
         running = true;
         StartCoroutine(ToCombat());
     }

@@ -5,7 +5,10 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// Run state. Score 0-29 is the Flappy phase; at 30 the BossDirector takes over (WASD + shoot gauntlet of 3 bosses x 3 phases).
 /// A checkpoint survives scene reloads so the death screen can retry the current boss.
+/// <see cref="Mode"/> picks Classic (Flappy then bosses), endless Flappy, or Boss Rush only.
 /// </summary>
+public enum RunMode { Classic, Flappy, BossRush }
+
 public class GameState : MonoBehaviour
 {
     public static GameState I { get; private set; }
@@ -21,9 +24,10 @@ public class GameState : MonoBehaviour
     public static int CheckpointBoss = -1;
     static int checkpointScore;
     public static bool God;   // debug only (AutoPilot)
+    public static RunMode Mode = RunMode.Classic;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { CheckpointBoss = -1; checkpointScore = 0; God = false; ScoreChanged = null; Died = null; Won = null; CombatStarted = null; }
+    static void ResetStatics() { CheckpointBoss = -1; checkpointScore = 0; God = false; Mode = RunMode.Classic; ScoreChanged = null; Died = null; Won = null; CombatStarted = null; }
 
     public int Score { get; private set; }
     public bool Alive { get; private set; } = true;
@@ -49,12 +53,20 @@ public class GameState : MonoBehaviour
 
     void Start()
     {
-        if (!FromCheckpoint) AudioManager.Music("music_flappy", 0.5f);
+        if (!FromCheckpoint && Mode != RunMode.BossRush) AudioManager.Music("music_flappy", 0.5f);
     }
 
     void OnDestroy() { if (I == this) I = null; }
 
-    void Update() { if (Combat && Alive) FightTime += Time.deltaTime; }
+    void Update()
+    {
+        if (Combat && Alive) FightTime += Time.deltaTime;
+        if (!Started && !Combat)
+        {
+            int m = CombatInput.ModeKey();
+            if (m > 0) { Mode = (RunMode)(m - 1); Restart(); }
+        }
+    }
 
     public void Begin() { Started = true; }
 
@@ -103,7 +115,7 @@ public class GameState : MonoBehaviour
 
     void RecordBest()
     {
-        if (Score <= Best) return;
+        if (Mode == RunMode.BossRush || Score <= Best) return;
         Best = Score;
         SaveSystem.Data.bestFlappy = Best;
         SaveSystem.Save();

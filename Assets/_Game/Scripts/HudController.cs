@@ -37,6 +37,7 @@ public class HudController : MonoBehaviour
         score.Show(GameState.I ? GameState.I.Score : 0);
         tapPrompt.SetActive(true);
         BuildCombatHud();
+        BuildModeHint();
     }
 
     void OnScore(int s) { score.Show(s); }
@@ -99,6 +100,22 @@ public class HudController : MonoBehaviour
     }
 
     // ---------------------------------------------------------------- combat HUD
+    Transform modeRoot;
+
+    /// <summary>Temporary menu until the Hangar exists: mode keys + coin balance.</summary>
+    void BuildModeHint()
+    {
+        modeRoot = new GameObject("ModeHint").transform;
+        modeRoot.SetParent(transform, false);
+        string[] names = { "1 CLASSIC", "2 FLAPPY", "3 BOSS RUSH" };
+        for (int i = 0; i < names.Length; i++)
+        {
+            bool on = (int)GameState.Mode == i;
+            Txt(modeRoot, names[i], new Vector2(-4f + i * 4f, -3.6f), 1f, on ? Announcer.Yellow : Color.white, Order + 1);
+        }
+        Txt(modeRoot, "COINS " + SaveSystem.Data.coins, new Vector2(6.2f, 3.7f), 1f, Announcer.Yellow, Order + 1, PixelText.Align.Right);
+    }
+
     void BuildCombatHud()
     {
         combatRoot = new GameObject("CombatHud").transform;
@@ -158,6 +175,7 @@ public class HudController : MonoBehaviour
         var gs = GameState.I;
         if (gs == null) return;
         if (gs.Started && tapPrompt.activeSelf) tapPrompt.SetActive(false);
+        if (modeRoot && modeRoot.gameObject.activeSelf == (gs.Started || gs.Combat)) modeRoot.gameObject.SetActive(!gs.Started && !gs.Combat);
         bool showScore = !gs.Combat && mode == Screen.None;
         if (score.gameObject.activeSelf != showScore) score.gameObject.SetActive(showScore);
         bool combat = gs.Combat && gs.Alive;
