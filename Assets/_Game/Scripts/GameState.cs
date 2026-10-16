@@ -43,7 +43,7 @@ public class GameState : MonoBehaviour
     void Awake()
     {
         I = this;
-        Best = PlayerPrefs.GetInt("best", 0);
+        Best = SaveSystem.Data.bestFlappy;
         if (CheckpointBoss >= 0) { FromCheckpoint = true; Score = checkpointScore; BossIndex = CheckpointBoss; }
     }
 
@@ -86,8 +86,27 @@ public class GameState : MonoBehaviour
         Victory = true;
         Alive = false;
         CheckpointBoss = -1;
-        if (Score > Best) { Best = Score; PlayerPrefs.SetInt("best", Best); }
+        RecordBest();
+        GrantRun(true);
         Won?.Invoke();
+    }
+
+    /// <summary>Last run's payout (coins/xp already saved). Null until a run ends.</summary>
+    public RunResult LastResult { get; private set; }
+
+    void GrantRun(bool won)
+    {
+        string id = Combat ? "bossrush" : "flappy";
+        LastResult = Economy.Grant(RunResult.Create(id, Score, won, Time.timeSinceLevelLoad));
+        Debug.Log($"[Economy] {id} score={Score} won={won} +{LastResult.coinsEarned} coins (total {SaveSystem.Data.coins})");
+    }
+
+    void RecordBest()
+    {
+        if (Score <= Best) return;
+        Best = Score;
+        SaveSystem.Data.bestFlappy = Best;
+        SaveSystem.Save();
     }
 
     public void Add(int n = 1)
@@ -102,7 +121,8 @@ public class GameState : MonoBehaviour
     {
         if (!Alive || God) return;
         Alive = false;
-        if (Score > Best) { Best = Score; PlayerPrefs.SetInt("best", Best); }
+        RecordBest();
+        GrantRun(false);
         Died?.Invoke();
     }
 

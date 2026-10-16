@@ -52,6 +52,7 @@ public static class SaveSystem
             loaded = new SaveData();
             if (PlayerPrefs.HasKey("best"))
                 loaded.bestFlappy = PlayerPrefs.GetInt("best");
+            loaded.musicOn = PlayerPrefs.GetInt("mute", 0) == 0;
         }
         Migrate(loaded);
         _data = loaded;

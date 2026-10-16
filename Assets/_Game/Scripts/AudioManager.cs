@@ -24,7 +24,7 @@ public class AudioManager : MonoBehaviour
     void Awake()
     {
         I = this;
-        muted = PlayerPrefs.GetInt("mute", 0) == 1;
+        muted = !SaveSystem.Data.musicOn;
         foreach (var c in clips) if (c) map[c.name] = c;
         pool = new AudioSource[voices];
         for (int i = 0; i < voices; i++) pool[i] = MakeSource(false);
@@ -46,7 +46,7 @@ public class AudioManager : MonoBehaviour
         if (CombatInput.MutePressed())
         {
             muted = !muted;
-            PlayerPrefs.SetInt("mute", muted ? 1 : 0);
+            SaveSystem.Data.musicOn = !muted; SaveSystem.Save();
             AudioListener.volume = muted ? 0f : 1f;
         }
     }
