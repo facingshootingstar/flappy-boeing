@@ -197,7 +197,7 @@ public class LevelMap : MonoBehaviour
         var star = GameKit.I ? GameKit.I.parryStar : Ui.Disc;
         Ui.Spr("StarIcon", top, star, new Vector2(-6.9f, 3.85f), Order + 31, 0.5f).color = Announcer.Yellow;
         starsText = Ui.Txt(top, LevelFlow.TotalStars() + "/" + LevelDB.MaxStars, new Vector2(-6.5f, 3.85f), 1.1f, Color.white, Order + 31, PixelText.Align.Left);
-        Ui.Txt(top, "FLAPPY BOEING", new Vector2(0f, 3.85f), 1.2f, Announcer.Yellow, Order + 31, PixelText.Align.Center, PixelText.Effect.Boil);
+        Ui.Txt(top, CutsceneDB.Title, new Vector2(0f, 3.85f), 1.15f, Announcer.Yellow, Order + 31, PixelText.Align.Center, PixelText.Effect.Boil);
         coinsText = Ui.Txt(top, SaveSystem.Data.coins + " COINS", new Vector2(7.1f, 3.85f), 1.1f, Announcer.Yellow, Order + 31, PixelText.Align.Right);
         storyBtn = Ui.Btn(top, "STORY", new Vector2(-6.15f, 3.2f), new Vector2(2.15f, 0.48f), Announcer.Cream, Order + 31);
         postBtn = Ui.Btn(top, "POSTCARDS", new Vector2(5.45f, 3.2f), new Vector2(3.4f, 0.48f), Announcer.Cream, Order + 31);

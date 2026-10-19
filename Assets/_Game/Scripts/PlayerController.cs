@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Poeing. Flappy phase (score under 30): tap = lift, gravity always pulls down, one hit kills.
+/// Poe. Flappy phase (score under 30): tap = lift, gravity always pulls down, one hit kills.
 /// Combat (boss gauntlet): WASD / arrows move freely, Shift / L dashes (short invulnerability, dash into pink = parry).
 /// Shooting lives in PlayerWeapons, hit points and parry in PlayerHealth. Collider is the fuselage only.
 /// </summary>
