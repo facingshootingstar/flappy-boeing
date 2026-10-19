@@ -61,7 +61,7 @@ public class CargoStack : MiniGame
     {
         // slide
         float lim = Limit();
-        curX += dir * Speed * dt;
+        curX += dir * Speed * dt + Gust * dt;
         if (curX > lim) { curX = lim; dir = -1f; } else if (curX < -lim) { curX = -lim; dir = 1f; }
         sway += dt;
         float swayX = Mathf.Sin(sway * 1.3f) * level.hard * 0.25f * Mathf.Min(1f, placed / 6f);
@@ -108,7 +108,7 @@ public class CargoStack : MiniGame
             x = topX; w = curW;
             combo++;
             score++;
-            if (combo >= 3) w = Mathf.Min(MaxW, w + 0.18f);
+            if (combo >= 3) { w = Mathf.Min(MaxW, w + 0.18f); GrantQuota(); }
             AudioManager.Sfx("parry", 0.7f, 0f, 0f, 1f + Mathf.Min(combo, 8) * 0.06f);
             Sparkle(new Vector2(x - w / 2f, y) + (Vector2)stack.localPosition, Announcer.Yellow, 1f);
             Sparkle(new Vector2(x + w / 2f, y) + (Vector2)stack.localPosition, Announcer.Yellow, 1f);

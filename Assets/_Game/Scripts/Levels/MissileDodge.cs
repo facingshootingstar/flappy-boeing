@@ -14,6 +14,7 @@ public class MissileDodge : MiniGame
 
     Transform plane, pickup;
     float heading;
+    int grabs;
     readonly List<Missile> missiles = new List<Missile>();
     float spawnAt = 1.2f;
 
@@ -41,6 +42,7 @@ public class MissileDodge : MiniGame
         heading += turn * TurnRate * dt;
         var dir = new Vector2(Mathf.Cos(heading * Mathf.Deg2Rad), Mathf.Sin(heading * Mathf.Deg2Rad));
         Vector2 p = (Vector2)plane.localPosition + dir * PlaneSpeed * dt;
+        p.x += Gust * dt;
         if (p.x > W + 0.6f) p.x = -W - 0.6f; else if (p.x < -W - 0.6f) p.x = W + 0.6f;
         if (p.y > H + 0.4f) p.y = -H - 0.4f; else if (p.y < -H - 0.4f) p.y = H + 0.4f;
         plane.localPosition = p;
@@ -51,8 +53,10 @@ public class MissileDodge : MiniGame
         if (Vector2.Distance(p, pickup.localPosition) < 0.6f)
         {
             score++;
+            grabs++;
+            if (grabs >= 2) GrantQuota();
+            PopText("STAR!", pickup.localPosition, grabs);
             Sparkle(pickup.localPosition, Announcer.Yellow, 1.2f);
-            AudioManager.Sfx("score", 0.6f, 0f);
             pickup.localPosition = RandomSpot();
         }
         pickup.localRotation = Quaternion.Euler(0f, 0f, elapsed * 90f);

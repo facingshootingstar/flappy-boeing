@@ -40,7 +40,21 @@ public static class LevelFlow
     }
 
     public static int Stars(int id) { var r = Record(id); return r != null ? r.stars : 0; }
-    public static bool Unlocked(int id) => id == 1 || Stars(id - 1) > 0;
+    public static bool Unlocked(int id) => id == 1 || (Stars(id - 1) > 0 && LevelDB.GateBlock(id) == 0);
+
+    public const int ChestEvery = 10, ChestCoins = 25;
+    public static int ChestsEarned => TotalStars() / ChestEvery;
+    public static bool ChestOpen(int i) => i >= 0 && (SaveSystem.Data.chestMask & (1 << i)) != 0;
+    public static bool ChestReady(int i) => i >= 0 && i < 31 && i < ChestsEarned && !ChestOpen(i);
+
+    public static bool ClaimChest(int i)
+    {
+        if (!ChestReady(i)) return false;
+        SaveSystem.Data.chestMask |= 1 << i;
+        SaveSystem.Data.coins += ChestCoins;
+        SaveSystem.Save();
+        return true;
+    }
 
     public static int TotalStars()
     {
@@ -175,11 +189,19 @@ public class LevelRuntime : MonoBehaviour
             default:
                 GameState.Mode = RunMode.Flappy;
                 SetRoots(GameplayRoots, false);
-                if (Level.game == LevelGame.Missile) gameObject.AddComponent<MissileDodge>();
-                else if (Level.game == LevelGame.Stack) gameObject.AddComponent<CargoStack>();
-                else gameObject.AddComponent<PerfectLanding>();
+                switch (Level.game)
+                {
+                    case LevelGame.Missile: gameObject.AddComponent<MissileDodge>(); break;
+                    case LevelGame.Stack: gameObject.AddComponent<CargoStack>(); break;
+                    case LevelGame.Landing: gameObject.AddComponent<PerfectLanding>(); break;
+                    case LevelGame.Supply: gameObject.AddComponent<SupplyDrop>(); break;
+                    case LevelGame.Bolt: gameObject.AddComponent<BoltLane>(); break;
+                    case LevelGame.Refuel: gameObject.AddComponent<SkyRefuel>(); break;
+                }
                 break;
         }
+        if (Level.twist == LevelTwist.Night && (Level.game == LevelGame.Flappy || Level.game == LevelGame.Boss))
+            Ui.Box("Night", transform, Vector2.zero, new Vector2(20f, 12f), new Color(0.02f, 0.03f, 0.1f, 0.34f), 13);
     }
 
     void OnEnable() { GameState.Died += OnDied; GameState.Won += OnWon; GameState.ScoreChanged += OnScore; }
@@ -302,7 +324,7 @@ public class LevelRuntime : MonoBehaviour
         Ui.Txt(result, o.level.ScoreName + "  " + o.score, new Vector2(0f, -0.35f), 1.3f, Color.white, 192);
         Ui.Txt(result, "+" + o.coins + " COINS" + (o.newStars > 0 ? "   NEW STARS +" + o.newStars : ""), new Vector2(0f, -0.95f), 1f, Announcer.Yellow, 192);
 
-        bool hasNext = o.won && LevelDB.Get(o.level.id + 1) != null;
+        bool hasNext = o.won && LevelDB.Get(o.level.id + 1) != null && LevelFlow.Unlocked(o.level.id + 1);
         float bx = hasNext ? -2.7f : -1.5f;
         retryBtn = Ui.Btn(result, "RETRY", new Vector2(bx, -2.1f), new Vector2(2.4f, 0.9f), Color.white, 192);
         mapBtn = Ui.Btn(result, "MAP", new Vector2(bx + (hasNext ? 2.7f : 3f), -2.1f), new Vector2(2.4f, 0.9f), Announcer.Teal, 192);

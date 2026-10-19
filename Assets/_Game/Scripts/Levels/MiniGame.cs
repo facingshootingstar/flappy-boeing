@@ -30,7 +30,34 @@ public abstract class MiniGame : MonoBehaviour
         hudRight = Ui.Txt(root, "", new Vector2(7.1f, 3.8f), 1.1f, Announcer.Yellow, Order + 50, PixelText.Align.Right);
         hint = Ui.Txt(root, HintText, new Vector2(0f, -3.75f), 0.9f, Announcer.Cream, Order + 50);
         Build();
+        if (level.twist == LevelTwist.Night)
+            Ui.Box("Night", root, Vector2.zero, new Vector2(18f, 10f), new Color(0.04f, 0.05f, 0.12f, 0.38f), Order + 12);
         StartCoroutine(CountIn());
+    }
+
+    /// <summary>Sideways gust for Wind levels. Zero otherwise.</summary>
+    protected float Gust => level.twist == LevelTwist.Wind ? Mathf.Sin(elapsed * 1.7f) * (0.7f + level.hard) : 0f;
+
+    bool quotaPaid;
+
+    /// <summary>One-shot side bonus worth the gap between 2 stars and 3. Never fails the level.</summary>
+    protected void GrantQuota()
+    {
+        if (quotaPaid || level.twist != LevelTwist.Quota) return;
+        quotaPaid = true;
+        score += Mathf.Max(1, level.stars[2] - level.stars[1]);
+        PopText("BONUS!", new Vector2(0f, 1.7f), 4);
+        AudioManager.Sfx("super", 0.75f);
+    }
+
+    /// <summary>Bouncy word, a small shake, and a combo that climbs in pitch.</summary>
+    protected void PopText(string word, Vector2 at, int combo = 1)
+    {
+        var t = Ui.Txt(root, word, at, 1.5f, Announcer.Yellow, Order + 56, PixelText.Align.Center, PixelText.Effect.Boil);
+        Destroy(t.gameObject, 0.7f);
+        float pitch = Mathf.Clamp(1f + (combo - 1) * 0.07f, 0.9f, 1.7f);
+        AudioManager.Sfx("score", 0.5f, 0.02f, 0.02f, pitch);
+        CameraFx.Shake(0.04f + 0.012f * combo, 0.1f);
     }
 
     protected abstract string HintText { get; }

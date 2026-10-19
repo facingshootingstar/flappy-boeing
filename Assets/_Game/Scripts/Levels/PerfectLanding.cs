@@ -72,7 +72,7 @@ public class PerfectLanding : MiniGame
         float wind = Mathf.Sin(elapsed * 1.9f) * Mathf.Sin(elapsed * 0.7f + 1f) * level.hard * 1.6f;
         vy += (Gravity + (lift ? Lift : 0f) + wind) * dt;
         vy = Mathf.Clamp(vy, -4f, 2.2f);
-        Vector2 p = (Vector2)plane.localPosition + new Vector2(vx, vy) * dt;
+        Vector2 p = (Vector2)plane.localPosition + new Vector2(vx + Gust * 0.55f, vy) * dt;
         p.y = Mathf.Min(p.y, H - 0.3f);
         plane.localPosition = p;
         plane.localRotation = Quaternion.Euler(0f, 0f, Mathf.Clamp(vy * 9f, -25f, 18f));
@@ -116,6 +116,7 @@ public class PerfectLanding : MiniGame
     {
         score += pts;
         landings++;
+        if (pts >= 75) GrantQuota();
         flying = false;
         pause = 1.3f;
         Hud("LANDING " + Mathf.Min(landings + 1, level.goal) + "/" + level.goal, "POINTS " + score);

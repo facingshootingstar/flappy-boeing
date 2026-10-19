@@ -16,6 +16,10 @@ public class LevelMap : MonoBehaviour
     float scroll, target, minScroll, maxScroll;
     int selected;
     Transform plane;
+    Vector2 planeFrom, planeTo;
+    float planeT = 1f;
+    readonly List<Transform> chests = new List<Transform>();
+    readonly List<Vector2> chestPos = new List<Vector2>();
 
     bool pressing, dragging;
     Vector2 pressAt;
@@ -44,10 +48,17 @@ public class LevelMap : MonoBehaviour
 
         int frontier = LevelFlow.Frontier();
         selected = Mathf.Clamp(LevelFlow.Focus > 0 && LevelFlow.Unlocked(LevelFlow.Focus) ? LevelFlow.Focus : frontier, 1, LevelDB.Count);
+        int from = frontier;
+        if (LevelFlow.Last != null && LevelFlow.Last.won)
+            from = Mathf.Clamp(LevelFlow.Last.level.id, 1, frontier);
+        planeFrom = nodePos[from - 1];
+        planeTo = nodePos[frontier - 1];
+        planeT = from == frontier ? 1f : 0f;
+        BuildChests();
         var fly = LevelRuntime.Fly;
         if (fly != null && fly.Length > 0)
         {
-            var sr = Ui.Spr("You", strip, fly[0], nodePos[frontier - 1] + new Vector2(0f, 1.05f), Order + 8, 0.55f);
+            var sr = Ui.Spr("You", strip, fly[0], planeFrom + new Vector2(0.3f, 1.05f), Order + 8, 0.55f);
             sr.gameObject.AddComponent<SpriteAnimator>().frames = fly;
             plane = sr.transform;
         }
@@ -81,6 +92,14 @@ public class LevelMap : MonoBehaviour
         var c = LevelDB.WorldColor[w];
         Ui.Txt(strip, "WORLD " + (w + 1), new Vector2(cx, 2.85f), 1f, Announcer.Cream, Order - 10);
         Ui.Txt(strip, LevelDB.Worlds[w], new Vector2(cx, 2.35f), 1.6f, c, Order - 10, PixelText.Align.Center, PixelText.Effect.Wave);
+        if (w > 0 && w < LevelDB.GateStars.Length)
+        {
+            bool gateOpen = LevelFlow.Unlocked(w * LevelDB.PerWorld + 1);
+            var arch = Ui.Spr("Gate", strip, PropArt.Gate, new Vector2(w * Segment + 0.2f, 0.2f), Order - 4, 1.05f);
+            if (!gateOpen) arch.color = new Color(0.45f, 0.45f, 0.52f, 0.95f);
+            Ui.Txt(strip, LevelDB.GateStars[w] + " STARS", new Vector2(w * Segment + 0.2f, -0.9f), 0.65f,
+                gateOpen ? Announcer.Yellow : Announcer.Cream, Order - 3);
+        }
         // locked worlds get a haze until their first level opens
         if (!LevelFlow.Unlocked(w * LevelDB.PerWorld + 1))
         {
@@ -127,11 +146,12 @@ public class LevelMap : MonoBehaviour
                 if (!open) sr.color = new Color(0.25f, 0.22f, 0.22f);
             }
             Ui.Txt(n, lv.goal >= 0 ? "BOSS" : "FINAL", new Vector2(0f, -0.95f), 0.8f, open ? Announcer.Red : Announcer.Cream, Order + 3);
+            if (!open) Ui.Txt(n, "?", new Vector2(0.55f, 0.42f), 0.9f, Announcer.Cream, Order + 4);
         }
         else
         {
-            Ui.Txt(n, lv.id.ToString(), new Vector2(0f, 0.02f), 1.5f, open ? Ui.Ink : new Color(0.3f, 0.28f, 0.28f), Order + 3);
-            Ui.Txt(n, Short(lv.game), new Vector2(0f, -0.72f), 0.7f, open ? Color.white : new Color(0.7f, 0.68f, 0.68f), Order + 3);
+            Ui.Txt(n, open ? lv.id.ToString() : "?", new Vector2(0f, 0.02f), 1.5f, open ? Ui.Ink : Announcer.Cream, Order + 3);
+            Ui.Txt(n, Short(lv.game), new Vector2(0f, -0.72f), 0.7f, open ? Color.white : new Color(0.75f, 0.72f, 0.72f), Order + 3);
         }
 
         // three stars on an arc above the node
@@ -142,7 +162,7 @@ public class LevelMap : MonoBehaviour
             var sr = Ui.Spr("Star", n, star, p, Order + 4, 0.42f);
             sr.color = s < stars ? Announcer.Yellow : new Color(0.15f, 0.12f, 0.12f, open ? 0.55f : 0.3f);
         }
-        if (!open) Ui.Txt(n, "?", new Vector2(0.42f * size, -0.32f * size), 1f, Announcer.Cream, Order + 4);
+
         return n;
     }
 
@@ -154,6 +174,9 @@ public class LevelMap : MonoBehaviour
             case LevelGame.Missile: return "DODGE";
             case LevelGame.Stack: return "STACK";
             case LevelGame.Landing: return "LAND";
+            case LevelGame.Supply: return "DROP";
+            case LevelGame.Bolt: return "BOLT";
+            case LevelGame.Refuel: return "FUEL";
             default: return "BOSS";
         }
     }
@@ -217,8 +240,44 @@ public class LevelMap : MonoBehaviour
         }
         if (plane)
         {
-            var p = nodePos[LevelFlow.Frontier() - 1];
-            plane.localPosition = p + new Vector2(0f, 1.25f + 0.12f * Mathf.Sin(t * 3f));
+            if (planeT < 1f)
+            {
+                planeT = Mathf.Min(1f, planeT + Time.unscaledDeltaTime * 0.65f);
+                float e = planeT * planeT * (3f - 2f * planeT);
+                var p = Vector2.Lerp(planeFrom, planeTo, e);
+                p.y += Mathf.Sin(e * Mathf.PI) * 0.85f;
+                plane.localPosition = p + new Vector2(0.3f, 0.9f);
+                if (planeT >= 1f) Arrive();
+            }
+            else plane.localPosition = planeTo + new Vector2(0.3f, 1.15f + 0.1f * Mathf.Sin(t * 3f));
+        }
+        for (int c = 0; c < chests.Count; c++)
+            if (LevelFlow.ChestReady(c))
+                chests[c].localScale = Vector3.one * (0.95f + 0.08f * Mathf.Sin(t * 5f + c));
+    }
+
+    void Arrive()
+    {
+        AudioManager.Sfx("super", 0.65f);
+        CameraFx.Shake(0.07f, 0.16f);
+        int i = LevelFlow.Frontier() - 1;
+        if (i >= 0 && i < nodes.Count) StartCoroutine(Shake(nodes[i]));
+    }
+
+    void BuildChests()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            Vector2 p = i + 1 < LevelDB.Worlds.Length
+                ? new Vector2((i + 1) * Segment + 0.2f, 1.65f)
+                : nodePos[nodePos.Count - 1] + new Vector2(1.7f, 1.25f);
+            chestPos.Add(p);
+            bool open = LevelFlow.ChestOpen(i);
+            var sr = Ui.Spr("Chest" + i, strip, PropArt.Chest, p, Order + 6, 0.85f);
+            if (open) sr.color = new Color(0.65f, 0.65f, 0.65f, 0.8f);
+            chests.Add(sr.transform);
+            Ui.Txt(strip, ((i + 1) * LevelFlow.ChestEvery).ToString(), p + new Vector2(0f, -0.55f), 0.6f,
+                open ? Announcer.Cream : Announcer.Yellow, Order + 7);
         }
     }
 
@@ -235,6 +294,22 @@ public class LevelMap : MonoBehaviour
     void Click(Vector2 world)
     {
         var local = world + new Vector2(scroll, 0f);
+        for (int c = 0; c < chestPos.Count; c++)
+        {
+            if (Vector2.Distance(local, chestPos[c]) > 0.55f) continue;
+            if (LevelFlow.ClaimChest(c))
+            {
+                AudioManager.Sfx("super", 0.85f);
+                CameraFx.Shake(0.08f, 0.18f);
+                var sr = chests[c].GetComponent<SpriteRenderer>();
+                if (sr) sr.color = new Color(0.65f, 0.65f, 0.65f, 0.8f);
+                coinsText.Text = SaveSystem.Data.coins + " COINS";
+                var pop = Ui.Txt(strip, "+25 COINS", chestPos[c] + new Vector2(0f, 0.7f), 0.75f, Announcer.Yellow, Order + 12);
+                Destroy(pop.gameObject, 1.1f);
+            }
+            else AudioManager.Sfx("hurt", 0.35f);
+            return;
+        }
         for (int i = 0; i < nodePos.Count; i++)
         {
             float r = LevelDB.All[i].IsBoss ? 0.75f : 0.6f;
@@ -243,6 +318,12 @@ public class LevelMap : MonoBehaviour
             {
                 AudioManager.Sfx("hurt", 0.4f);
                 StartCoroutine(Shake(nodes[i]));
+                int need = LevelDB.GateBlock(i + 1);
+                if (need > 0)
+                {
+                    var pop = Ui.Txt(strip, "NEED " + need + " STARS", nodePos[i] + new Vector2(0f, 1.15f), 0.7f, Announcer.Yellow, Order + 12);
+                    Destroy(pop.gameObject, 1.1f);
+                }
                 return;
             }
             selected = i + 1;
@@ -301,6 +382,9 @@ public class LevelMap : MonoBehaviour
             case LevelGame.Boss: return "WASD MOVE  SPACE SHOOT  SHIFT DASH";
             case LevelGame.Missile: return "A/D OR TAP SIDES TO TURN. CRASH MISSILES!";
             case LevelGame.Stack: return "TAP TO DROP. PERFECT DROPS STAY WIDE";
+            case LevelGame.Supply: return "A/D OR TAP TO CATCH THE CRATE";
+            case LevelGame.Bolt: return "A/D OR TAP TO SWITCH LANE";
+            case LevelGame.Refuel: return "A/D OR TAP TO MATCH THE TANKER";
             default: return "HOLD TO CLIMB. LET GO TO SINK. LAND SOFT";
         }
     }

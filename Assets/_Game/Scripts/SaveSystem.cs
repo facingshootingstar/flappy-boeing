@@ -33,6 +33,7 @@ public class SaveData
     public List<string> unlockedGames = new List<string> { "flappy", "bossrush" };
     public List<BossRecord> bossRecords = new List<BossRecord>();
     public List<LevelRecord> levels = new List<LevelRecord>();
+    public int chestMask;     // bit i set once the (i+1)*10 star chest is opened. Missing on old saves, so it stays 0.
     public bool musicOn = true;
     public float sfxVolume = 1f;
 }
