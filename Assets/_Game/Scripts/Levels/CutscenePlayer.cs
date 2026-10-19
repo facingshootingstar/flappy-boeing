@@ -19,7 +19,7 @@ public class CutscenePlayer : MonoBehaviour
     public static bool IsPlaying => I != null;
 
     const float HoldSkip = 0.6f;
-    const int Order = 230;
+    const int Order = 260; // above the map chrome (about 243) so the film covers STORY and the logo
 
     static readonly Dictionary<string, Sprite> artCache = new Dictionary<string, Sprite>();
 
