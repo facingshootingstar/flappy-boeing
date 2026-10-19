@@ -26,8 +26,14 @@ public class LevelMap : MonoBehaviour
     float pressScroll, lastX;
 
     LevelDef cardLevel;
-    Ui.Button playBtn, closeBtn;
+    Ui.Button playBtn, closeBtn, storyBtn, postBtn, panelClose, prevBtn, nextBtn;
     float cardAt;
+    Transform panel;
+    bool postcardsMode;
+    int storyPage;
+    readonly List<string> storyShown = new List<string>();
+    readonly List<Ui.Button> panelBtns = new List<Ui.Button>();
+    readonly List<string> panelIds = new List<string>();
 
     public static Vector2 NodePos(int index)
     {
@@ -66,7 +72,7 @@ public class LevelMap : MonoBehaviour
         maxScroll = Segment * LevelDB.Worlds.Length - Segment * 0.5f;
         scroll = target = Mathf.Clamp(nodePos[selected - 1].x, minScroll, maxScroll);
         Apply();
-        AudioManager.Music("music_flappy", 0.5f);
+        if (!CutscenePlayer.IsPlaying) AudioManager.Music("music_flappy", 0.5f);
     }
 
     // ---------------------------------------------------------------- build
@@ -193,6 +199,8 @@ public class LevelMap : MonoBehaviour
         starsText = Ui.Txt(top, LevelFlow.TotalStars() + "/" + LevelDB.MaxStars, new Vector2(-6.5f, 3.85f), 1.1f, Color.white, Order + 31, PixelText.Align.Left);
         Ui.Txt(top, "FLAPPY BOEING", new Vector2(0f, 3.85f), 1.2f, Announcer.Yellow, Order + 31, PixelText.Align.Center, PixelText.Effect.Boil);
         coinsText = Ui.Txt(top, SaveSystem.Data.coins + " COINS", new Vector2(7.1f, 3.85f), 1.1f, Announcer.Yellow, Order + 31, PixelText.Align.Right);
+        storyBtn = Ui.Btn(top, "STORY", new Vector2(-6.15f, 3.2f), new Vector2(2.15f, 0.48f), Announcer.Cream, Order + 31);
+        postBtn = Ui.Btn(top, "POSTCARDS", new Vector2(5.45f, 3.2f), new Vector2(3.4f, 0.48f), Announcer.Cream, Order + 31);
         Ui.Box("Foot", top, new Vector2(0f, -3.95f), new Vector2(16f, 0.5f), band, Order + 30);
         Ui.Txt(top, "DRAG OR ARROWS: MOVE   SPACE: PLAY   FREE PLAY: 1 CLASSIC  2 ENDLESS  3 BOSS RUSH",
             new Vector2(0f, -3.95f), 0.62f, Announcer.Cream, Order + 31);
@@ -201,6 +209,8 @@ public class LevelMap : MonoBehaviour
     // ---------------------------------------------------------------- input
     void Update()
     {
+        if (CutscenePlayer.IsPlaying) return;
+        if (panel) { PanelInput(); Animate(); return; }
         if (card) { CardInput(); Animate(); return; }
 
         if (UiInput.LeftDown()) Select(selected - 1);
@@ -222,7 +232,12 @@ public class LevelMap : MonoBehaviour
         if (pressing && UiInput.Up(out var u))
         {
             pressing = false;
-            if (!dragging) Click(u);
+            if (!dragging)
+            {
+                if (storyBtn.Hit(u)) OpenStories();
+                else if (postBtn.Hit(u)) OpenPostcards();
+                else Click(u);
+            }
         }
         Animate();
     }
@@ -393,6 +408,116 @@ public class LevelMap : MonoBehaviour
     {
         if (card) Destroy(card.gameObject);
         card = null; cardLevel = null;
+    }
+
+    void OpenStories()
+    {
+        ClosePanel();
+        postcardsMode = false;
+        storyShown.Clear();
+        var ids = CutsceneDB.StoryIds;
+        for (int i = 0; i < ids.Length; i++)
+            if (CutscenePlayer.Seen(ids[i])) storyShown.Add(ids[i]);
+        storyPage = 0;
+        AudioManager.Sfx("card", 0.6f);
+        BuildStoryPage();
+    }
+
+    void BuildStoryPage()
+    {
+        if (panel) Destroy(panel.gameObject);
+        panelBtns.Clear();
+        panelIds.Clear();
+        prevBtn = nextBtn = null;
+        panel = Ui.Root("Stories", transform);
+        var dim = Ui.Ink; dim.a = 0.62f;
+        Ui.Box("Dim", panel, Vector2.zero, new Vector2(20f, 12f), dim, Order + 40);
+        Ui.Plaque(panel, new Vector2(0f, -0.2f), new Vector2(11.4f, 6.5f), Order + 41);
+        Ui.Txt(panel, "STORY", new Vector2(0f, 2.5f), 1.5f, Announcer.Yellow, Order + 42, PixelText.Align.Center, PixelText.Effect.Boil);
+        panelClose = Ui.Btn(panel, "X", new Vector2(5.05f, 2.55f), new Vector2(0.7f, 0.7f), Announcer.Red, Order + 42);
+        if (storyShown.Count == 0)
+            Ui.Txt(panel, "NO STORIES YET", new Vector2(0f, 0.2f), 1.1f, Announcer.Cream, Order + 42);
+        else
+        {
+            const int per = 8;
+            int start = storyPage * per;
+            for (int i = 0; i < per && start + i < storyShown.Count; i++)
+            {
+                var pos = new Vector2(i % 2 == 0 ? -2.55f : 2.55f, 1.4f - (i / 2) * 0.82f);
+                string id = storyShown[start + i];
+                panelBtns.Add(Ui.Btn(panel, CutsceneDB.Label(id), pos, new Vector2(4.9f, 0.68f), Announcer.Cream, Order + 42));
+                panelIds.Add(id);
+            }
+            int pages = (storyShown.Count + per - 1) / per;
+            if (pages > 1)
+            {
+                prevBtn = Ui.Btn(panel, "PREV", new Vector2(-2.2f, -2.55f), new Vector2(2.2f, 0.62f), Announcer.Teal, Order + 42);
+                nextBtn = Ui.Btn(panel, "NEXT", new Vector2(2.2f, -2.55f), new Vector2(2.2f, 0.62f), Announcer.Teal, Order + 42);
+            }
+        }
+        cardAt = Time.unscaledTime + 0.15f;
+    }
+
+    void OpenPostcards()
+    {
+        ClosePanel();
+        postcardsMode = true;
+        AudioManager.Sfx("card", 0.6f);
+        panel = Ui.Root("Postcards", transform);
+        var dim = Ui.Ink; dim.a = 0.62f;
+        Ui.Box("Dim", panel, Vector2.zero, new Vector2(20f, 12f), dim, Order + 40);
+        Ui.Txt(panel, "POSTCARDS", new Vector2(0f, 3.55f), 1.15f, Announcer.Yellow, Order + 42, PixelText.Align.Center, PixelText.Effect.Boil);
+        panelClose = Ui.Btn(panel, "X", new Vector2(6.55f, 3.55f), new Vector2(0.65f, 0.65f), Announcer.Red, Order + 42);
+        var have = SaveSystem.Data.postcards;
+        for (int i = 0; i < 25; i++)
+        {
+            var pos = new Vector2((i % 5 - 2) * 2.45f, 2.05f - (i / 5) * 1.12f);
+            string pid = CutsceneDB.PostcardId(i + 1);
+            bool got = have != null && have.Contains(pid);
+            if (got)
+            {
+                var pic = CutscenePlayer.LoadArt(pid);
+                if (pic) Ui.Spr("Pc", panel, pic, pos, Order + 42, 0.32f);
+            }
+            else
+            {
+                Ui.Box("Miss", panel, pos, new Vector2(1.55f, 0.95f), Ui.Ink, Order + 42);
+                Ui.Txt(panel, (i + 1).ToString(), pos, 0.65f, Announcer.Cream, Order + 43);
+            }
+        }
+        cardAt = Time.unscaledTime + 0.15f;
+    }
+
+    void ClosePanel()
+    {
+        if (panel) Destroy(panel.gameObject);
+        panel = null;
+        panelClose = null;
+        prevBtn = nextBtn = null;
+        panelBtns.Clear();
+        panelIds.Clear();
+    }
+
+    void PanelInput()
+    {
+        if (Time.unscaledTime < cardAt) return;
+        if (UiInput.Back()) { ClosePanel(); return; }
+        if (!UiInput.Up(out var p)) return;
+        if (panelClose != null && panelClose.Hit(p)) { ClosePanel(); return; }
+        if (!postcardsMode)
+        {
+            if (prevBtn != null && prevBtn.Hit(p) && storyPage > 0) { storyPage--; BuildStoryPage(); return; }
+            if (nextBtn != null && nextBtn.Hit(p) && (storyPage + 1) * 8 < storyShown.Count) { storyPage++; BuildStoryPage(); return; }
+            for (int i = 0; i < panelBtns.Count; i++)
+            {
+                if (!panelBtns[i].Hit(p)) continue;
+                string id = panelIds[i];
+                ClosePanel();
+                CutscenePlayer.Play(id, () => FilmFilter.IrisOpen(0.45f));
+                return;
+            }
+        }
+        if (Mathf.Abs(p.x) > 5.8f || Mathf.Abs(p.y) > 3.4f) ClosePanel();
     }
 
     void CardInput()

@@ -49,7 +49,11 @@ public class LevelDef
             switch (game)
             {
                 case LevelGame.Flappy: core = "PASS " + stars[0] + " PIPES"; break;
-                case LevelGame.Boss: core = goal < 0 ? "BEAT ALL 3 BOSSES" : "DEFEAT " + LevelDB.BossNames[goal]; break;
+                case LevelGame.Boss:
+                    if (id == 25) core = "DEFEAT THE BLACKOUT";
+                    else if (id == 20) core = "BEAT THE IRON FLOCK";
+                    else core = goal < 0 ? "BEAT ALL 3 BOSSES" : "DEFEAT " + LevelDB.BossNames[goal];
+                    break;
                 case LevelGame.Missile: core = "SURVIVE " + goal + " SECONDS"; break;
                 case LevelGame.Stack: core = "STACK " + goal + " CRATES"; break;
                 case LevelGame.Landing: core = "LAND " + goal + " TIMES"; break;

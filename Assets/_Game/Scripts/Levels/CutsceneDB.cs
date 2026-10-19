@@ -31,6 +31,41 @@ public static class CutsceneDB
     public const int GoldStars = 60;
     public const string Title = "POE: THE LAST MAIL RUN";
 
+    public static readonly string[] StoryIds =
+    {
+        "intro", "world1", "world2", "world3", "world4", "world5",
+        "boss0_in", "boss0_out", "boss1_in", "boss1_out", "boss2_in", "boss2_out",
+        "boss3_in", "boss3_out", "boss4_in", "boss4_out",
+        "ending_normal", "ending_gold", "postcredits",
+    };
+
+    public static string Label(string id)
+    {
+        switch (id)
+        {
+            case "intro": return "INTRO";
+            case "world1": return "DAWN VALLEY";
+            case "world2": return "SUNNY SEA";
+            case "world3": return "STORM PEAKS";
+            case "world4": return "SUNDOWN";
+            case "world5": return "STARLIGHT";
+            case "boss0_in": return "EAGLE CARD";
+            case "boss0_out": return "EAGLE FREE";
+            case "boss1_in": return "WAKE CARD";
+            case "boss1_out": return "HARBOR OPEN";
+            case "boss2_in": return "STORM GUNS";
+            case "boss2_out": return "SHARED FLIGHT";
+            case "boss3_in": return "LAST SWARM";
+            case "boss3_out": return "TOWER FALLS";
+            case "boss4_in": return "THE BLACKOUT";
+            case "boss4_out": return "LIGHT BACK";
+            case "ending_normal": return "AN ENDING";
+            case "ending_gold": return "GOLD ENDING";
+            case "postcredits": return "STRANGE MAIL";
+            default: return "STORY";
+        }
+    }
+
     static readonly string[] PipLines =
     {
         "FLAP LIKE YOU MEAN THE LETTER.",
@@ -309,6 +344,8 @@ public static class CutsceneDB
             if (!Legal(Cards[i]) || Cards[i].Length > 48) return "card " + (i + 1);
         }
         if (!Legal(Title)) return "title";
+        for (int i = 0; i < StoryIds.Length; i++)
+            if (!Legal(Label(StoryIds[i]))) return "label " + StoryIds[i];
         if (EnterId(1) != "world1" || EnterId(6) != "world2" || EnterId(5) != null) return "enter";
         if (BossInId(5) != "boss0_in" || BossOutId(25) != "boss4_out" || BossInId(4) != null) return "boss id";
         if (EndingId(59) != "ending_normal" || EndingId(60) != "ending_gold") return "ending";

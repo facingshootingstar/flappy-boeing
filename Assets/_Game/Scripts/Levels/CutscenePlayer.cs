@@ -138,6 +138,7 @@ public class CutscenePlayer : MonoBehaviour
             float t = 0f;
             while (t < shot.dur && !abort && !jump)
             {
+                if (MiniGame.Bot || SkipAll) { abort = true; break; }
                 t += Time.unscaledDeltaTime;
                 Apply(shot, t);
                 Reveal(textDone ? total : Mathf.Min(total, Mathf.CeilToInt(total * Mathf.Clamp01(t / typeDur))));

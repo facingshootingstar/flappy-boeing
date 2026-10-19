@@ -74,6 +74,24 @@ public static class LevelFlow
     // ---------------------------------------------------------------- navigation
     public static void Play(int id)
     {
+        if (LevelDB.Get(id) == null) return;
+        string enter = CutsceneDB.EnterId(id);
+        if (enter != null && !CutscenePlayer.Seen(enter))
+        {
+            CutscenePlayer.Play(enter, () => PlayNow(id));
+            return;
+        }
+        string card = CutsceneDB.BossInId(id);
+        if (card != null)
+        {
+            CutscenePlayer.Play(card, () => PlayNow(id));
+            return;
+        }
+        PlayNow(id);
+    }
+
+    static void PlayNow(int id)
+    {
         var lv = LevelDB.Get(id);
         if (lv == null) return;
         Current = lv;
@@ -82,6 +100,19 @@ public static class LevelFlow
         Last = null;
         GameState.CheckpointBoss = -1;
         Reload();
+    }
+
+    /// <summary>First clear of a level keeps one postcard. Returns false if that level already sent one.</summary>
+    public static bool CollectPostcard(int levelId)
+    {
+        string pid = CutsceneDB.PostcardId(levelId);
+        if (pid == null) return false;
+        var list = SaveSystem.Data.postcards;
+        if (list == null) SaveSystem.Data.postcards = list = new List<string>();
+        if (list.Contains(pid)) return false;
+        list.Add(pid);
+        SaveSystem.Save();
+        return true;
     }
 
     public static void Map()
@@ -177,7 +208,13 @@ public class LevelRuntime : MonoBehaviour
         I = this;
         GrabArt();
         Level = LevelFlow.Current;
-        if (LevelFlow.ShowMap) { OpenMap(); return; }
+        if (LevelFlow.ShowMap)
+        {
+            OpenMap();
+            if (!CutscenePlayer.Seen("intro"))
+                CutscenePlayer.Play("intro", () => FilmFilter.IrisOpen(0.55f));
+            return;
+        }
         if (Level == null) return;   // free play
         GameState.OnlyBoss = -1;
         var biome = FindAnyObjectByType<BiomeDirector>();
@@ -202,6 +239,22 @@ public class LevelRuntime : MonoBehaviour
         }
         if (Level.twist == LevelTwist.Night && (Level.game == LevelGame.Flappy || Level.game == LevelGame.Boss))
             Ui.Box("Night", transform, Vector2.zero, new Vector2(20f, 12f), new Color(0.02f, 0.03f, 0.1f, 0.34f), 13);
+        if (Level.id == 25) StartCoroutine(DrainLight());
+    }
+
+    /// <summary>The Blackout drinks the screen. It never changes hits or the bot's path.</summary>
+    IEnumerator DrainLight()
+    {
+        var veil = Ui.Box("Blackout", transform, Vector2.zero, new Vector2(20f, 12f), new Color(0.01f, 0.01f, 0.03f, 0f), 14);
+        float t = 0f;
+        while (veil)
+        {
+            t += Time.unscaledDeltaTime;
+            var c = veil.color;
+            c.a = Mathf.Clamp01(t / 45f) * 0.42f;
+            veil.color = c;
+            yield return null;
+        }
     }
 
     void OnEnable() { GameState.Died += OnDied; GameState.Won += OnWon; GameState.ScoreChanged += OnScore; }
@@ -210,6 +263,12 @@ public class LevelRuntime : MonoBehaviour
 
     void Start()
     {
+        if (Level != null && Level.id == 25)
+        {
+            var dir = FindAnyObjectByType<BossDirector>();
+            if (dir != null && dir.bosses != null && dir.bosses.Length > 2 && dir.bosses[2] != null)
+                dir.bosses[2].displayName = "THE BLACKOUT";
+        }
         if (Level != null && !LevelFlow.ShowMap) StartCoroutine(Intro());
     }
 
@@ -277,9 +336,10 @@ public class LevelRuntime : MonoBehaviour
     {
         var root = Ui.Root("LevelIntro", transform);
         var c = Ui.Ink; c.a = 0.55f;
-        Ui.Box("Band", root, new Vector2(0f, 1.6f), new Vector2(20f, 1.7f), c, 180);
+        Ui.Box("Band", root, new Vector2(0f, 1.35f), new Vector2(20f, 2.3f), c, 180);
         Ui.Txt(root, "LEVEL " + Level.id, new Vector2(0f, 2.05f), 2f, Announcer.Yellow, 181, PixelText.Align.Center, PixelText.Effect.Boil);
-        Ui.Txt(root, Level.GoalText, new Vector2(0f, 1.2f), 1.3f, Color.white, 181);
+        Ui.Txt(root, Level.GoalText, new Vector2(0f, 1.25f), 1.2f, Color.white, 181);
+        Ui.Txt(root, "PIP: " + CutsceneDB.PipLine(Level.id), new Vector2(0f, 0.55f), 0.7f, Announcer.Cream, 181);
         yield return new WaitForSeconds(2.2f);
         Destroy(root.gameObject);
     }
@@ -292,11 +352,30 @@ public class LevelRuntime : MonoBehaviour
     {
         if (finished) return;
         finished = true;
-        StartCoroutine(Result(o));
+        bool first = o.won && o.newStars == o.stars;
+        if (first) LevelFlow.CollectPostcard(o.level.id);
+        System.Action show = () => { if (this) StartCoroutine(Result(o, first)); };
+        System.Action ending = () =>
+        {
+            if (!o.won || o.level.id != 25) { show(); return; }
+            CutscenePlayer.Play(CutsceneDB.EndingId(LevelFlow.TotalStars()), () => CutscenePlayer.Play("postcredits", show));
+        };
+        if (first && o.level.IsBoss) CutscenePlayer.Play(CutsceneDB.BossOutId(o.level.id), ending);
+        else ending();
     }
 
-    IEnumerator Result(LevelFlow.Outcome o)
+    IEnumerator Result(LevelFlow.Outcome o, bool postcard)
     {
+        if (postcard)
+        {
+            var drop = Ui.Root("Postcard", transform);
+            var pic = CutscenePlayer.LoadArt(CutsceneDB.PostcardId(o.level.id));
+            if (pic) Ui.Spr("Pic", drop, pic, new Vector2(0f, 0.45f), 200, 0.7f);
+            Ui.Txt(drop, CutsceneDB.PostcardLine(o.level.id), new Vector2(0f, -1.35f), 0.7f, Announcer.Cream, 201);
+            AudioManager.Sfx("card", 0.7f);
+            yield return new WaitForSecondsRealtime(1.5f);
+            if (drop) Destroy(drop.gameObject);
+        }
         yield return new WaitForSecondsRealtime(o.won ? 0.9f : 1.1f);
         result = Ui.Root("LevelResult", transform);
         var dim = Ui.Ink; dim.a = 0.6f;
@@ -335,6 +414,7 @@ public class LevelRuntime : MonoBehaviour
 
     void Update()
     {
+        if (CutscenePlayer.IsPlaying) return;
         if (!result || Time.unscaledTime < inputAt) return;
         if (UiInput.Up(out var p))
         {
