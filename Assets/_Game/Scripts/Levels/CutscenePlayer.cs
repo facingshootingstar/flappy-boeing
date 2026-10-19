@@ -139,7 +139,8 @@ public class CutscenePlayer : MonoBehaviour
             while (t < shot.dur && !abort && !jump)
             {
                 if (MiniGame.Bot || SkipAll) { abort = true; break; }
-                t += Time.unscaledDeltaTime;
+                // ponytail: a stalled editor frame used to skip several seconds of the intro. Cap the step; upgrade path is a fixed intro clock.
+                t += Mathf.Min(Time.unscaledDeltaTime, 0.05f);
                 Apply(shot, t);
                 Reveal(textDone ? total : Mathf.Min(total, Mathf.CeilToInt(total * Mathf.Clamp01(t / typeDur))));
                 ReadInput();
