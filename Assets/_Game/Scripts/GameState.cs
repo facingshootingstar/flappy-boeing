@@ -25,9 +25,11 @@ public class GameState : MonoBehaviour
     static int checkpointScore;
     public static bool God;   // debug only (AutoPilot)
     public static RunMode Mode = RunMode.Classic;
+    /// <summary>Boss level: fight only this boss (-1 = whole gauntlet). Set by LevelRuntime.</summary>
+    public static int OnlyBoss = -1;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { CheckpointBoss = -1; checkpointScore = 0; God = false; Mode = RunMode.Classic; ScoreChanged = null; Died = null; Won = null; CombatStarted = null; }
+    static void ResetStatics() { CheckpointBoss = -1; checkpointScore = 0; God = false; Mode = RunMode.Classic; OnlyBoss = -1; ScoreChanged = null; Died = null; Won = null; CombatStarted = null; }
 
     public int Score { get; private set; }
     public bool Alive { get; private set; } = true;
@@ -64,7 +66,7 @@ public class GameState : MonoBehaviour
         if (!Started && !Combat)
         {
             int m = CombatInput.ModeKey();
-            if (m > 0) { Mode = (RunMode)(m - 1); Restart(); }
+            if (m > 0 && LevelFlow.Current == null) LevelFlow.FreePlay((RunMode)(m - 1));
         }
     }
 
@@ -116,7 +118,8 @@ public class GameState : MonoBehaviour
         else
         {
             // boss runs score by phases cleared (pipes don't count in combat); Classic also pays its Flappy leg
-            int phases = won ? BossCount * PhasesPerBoss : BossIndex * PhasesPerBoss + BossPhase;
+            int phases = OnlyBoss >= 0 ? (won ? PhasesPerBoss : BossPhase)
+                       : won ? BossCount * PhasesPerBoss : BossIndex * PhasesPerBoss + BossPhase;
             int flappyCoins = Mode == RunMode.Classic ? Economy.Grant(RunResult.Create("flappy", Score, false, t)).coinsEarned : 0;
             LastResult = Economy.Grant(RunResult.Create("bossrush", phases, won, t));
             LastResult.coinsEarned += flappyCoins;

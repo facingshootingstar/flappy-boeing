@@ -13,9 +13,17 @@ public class BossRecord
 }
 
 [Serializable]
+public class LevelRecord
+{
+    public int id;
+    public int stars;
+    public int best;
+}
+
+[Serializable]
 public class SaveData
 {
-    public int version = 1;
+    public int version = 2;
     public int coins;
     public int gems;
     public int pilotXp;
@@ -24,6 +32,7 @@ public class SaveData
     public List<string> unlockedPlanes = new List<string> { "boeing" };
     public List<string> unlockedGames = new List<string> { "flappy", "bossrush" };
     public List<BossRecord> bossRecords = new List<BossRecord>();
+    public List<LevelRecord> levels = new List<LevelRecord>();
     public bool musicOn = true;
     public float sfxVolume = 1f;
 }
@@ -102,6 +111,8 @@ public static class SaveSystem
         if (d.unlockedPlanes == null) d.unlockedPlanes = new List<string> { "boeing" };
         if (d.unlockedGames == null) d.unlockedGames = new List<string> { "flappy", "bossrush" };
         if (d.bossRecords == null) d.bossRecords = new List<BossRecord>();
+        if (d.levels == null) d.levels = new List<LevelRecord>();
+        if (d.version < 2) d.version = 2;
     }
 
     public static bool SpendCoins(int amount)

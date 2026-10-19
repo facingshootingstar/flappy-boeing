@@ -105,6 +105,7 @@ public class HudController : MonoBehaviour
     /// <summary>Temporary menu until the Hangar exists: mode keys + coin balance.</summary>
     void BuildModeHint()
     {
+        if (LevelFlow.Current != null) return;
         modeRoot = new GameObject("ModeHint").transform;
         modeRoot.SetParent(transform, false);
         string[] names = { "1 CLASSIC", "2 FLAPPY", "3 BOSS RUSH" };
@@ -196,11 +197,12 @@ public class HudController : MonoBehaviour
     // ---------------------------------------------------------------- end screens
     void OnDied()
     {
+        if (LevelFlow.Current != null) return;   // LevelRuntime shows the level result
         var gs = GameState.I;
         StartCoroutine(gs.Combat ? DiedScreen() : FlappyScreen());
     }
 
-    void OnWon() { StartCoroutine(WinScreen()); }
+    void OnWon() { if (LevelFlow.Current == null) StartCoroutine(WinScreen()); }
 
     Transform NewScreen(float dim)
     {

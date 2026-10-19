@@ -1,0 +1,325 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// Candy-Crush style world map: a winding trail of level nodes across four biome skies, scrolled sideways
+/// (drag, wheel, arrows). Nodes show stars earned; locked ones are greyed. Click a node (or Space) for its card, then PLAY.
+/// </summary>
+public class LevelMap : MonoBehaviour
+{
+    public const float Segment = 15f;      // one world = one 480px sky
+    const int Order = 200;
+
+    Transform strip, card, top;
+    readonly List<Vector2> nodePos = new List<Vector2>();
+    readonly List<Transform> nodes = new List<Transform>();
+    float scroll, target, minScroll, maxScroll;
+    int selected;
+    Transform plane;
+
+    bool pressing, dragging;
+    Vector2 pressAt;
+    float pressScroll, lastX;
+
+    LevelDef cardLevel;
+    Ui.Button playBtn, closeBtn;
+    float cardAt;
+
+    public static Vector2 NodePos(int index)
+    {
+        int w = index / LevelDB.PerWorld, j = index % LevelDB.PerWorld;
+        float x = w * Segment + 2.2f + j * 2.75f;
+        float y = 1.25f * Mathf.Sin(index * 1.3f + 0.6f) - 0.55f;
+        return new Vector2(x, y);
+    }
+
+    void Start()
+    {
+        strip = Ui.Root("MapStrip", transform);
+        for (int w = 0; w < LevelDB.Worlds.Length; w++) BuildWorld(w);
+        for (int i = 0; i < LevelDB.Count; i++) nodePos.Add(NodePos(i));
+        BuildTrail();
+        for (int i = 0; i < LevelDB.Count; i++) nodes.Add(BuildNode(LevelDB.All[i], nodePos[i]));
+        BuildTop();
+
+        int frontier = LevelFlow.Frontier();
+        selected = Mathf.Clamp(LevelFlow.Focus > 0 && LevelFlow.Unlocked(LevelFlow.Focus) ? LevelFlow.Focus : frontier, 1, LevelDB.Count);
+        var fly = LevelRuntime.Fly;
+        if (fly != null && fly.Length > 0)
+        {
+            var sr = Ui.Spr("You", strip, fly[0], nodePos[frontier - 1] + new Vector2(0f, 1.05f), Order + 8, 0.55f);
+            sr.gameObject.AddComponent<SpriteAnimator>().frames = fly;
+            plane = sr.transform;
+        }
+        minScroll = Segment * 0.5f;
+        maxScroll = Segment * LevelDB.Worlds.Length - Segment * 0.5f;
+        scroll = target = Mathf.Clamp(nodePos[selected - 1].x, minScroll, maxScroll);
+        Apply();
+        AudioManager.Music("music_flappy", 0.5f);
+    }
+
+    // ---------------------------------------------------------------- build
+    void BuildWorld(int w)
+    {
+        float cx = w * Segment + Segment / 2f;
+        var sky = LevelRuntime.Skies[LevelDB.WorldBiome[w]];
+        if (sky)
+        {
+            var sr = Ui.Spr("Sky" + w, strip, sky, new Vector2(cx, 0f), Order - 20);
+            sr.transform.localScale = new Vector3(Segment / sky.bounds.size.x * 1.002f, 8.6f / sky.bounds.size.y, 1f);
+        }
+        else Ui.Box("Sky" + w, strip, new Vector2(cx, 0f), new Vector2(Segment, 8.6f), LevelDB.WorldColor[w], Order - 20);
+
+        // rolling ground band so nodes sit on a landscape
+        var ground = Color.Lerp(LevelDB.WorldColor[w], new Color(0.25f, 0.45f, 0.3f), 0.55f);
+        for (int k = 0; k < 16; k++)
+        {
+            float x = w * Segment + k + 0.5f;
+            float h = 1.1f + 0.25f * Mathf.Sin((w * Segment + k) * 0.9f);
+            Ui.Box("Hill", strip, new Vector2(x, -4.2f + h / 2f), new Vector2(1.02f, h), ground, Order - 18);
+        }
+        var c = LevelDB.WorldColor[w];
+        Ui.Txt(strip, "WORLD " + (w + 1), new Vector2(cx, 2.85f), 1f, Announcer.Cream, Order - 10);
+        Ui.Txt(strip, LevelDB.Worlds[w], new Vector2(cx, 2.35f), 1.6f, c, Order - 10, PixelText.Align.Center, PixelText.Effect.Wave);
+        // locked worlds get a haze until their first level opens
+        if (!LevelFlow.Unlocked(w * LevelDB.PerWorld + 1))
+        {
+            var haze = Ui.Ink; haze.a = 0.35f;
+            Ui.Box("Haze", strip, new Vector2(cx, 0f), new Vector2(Segment, 8.6f), haze, Order - 9);
+        }
+    }
+
+    void BuildTrail()
+    {
+        for (int i = 0; i + 1 < nodePos.Count; i++)
+        {
+            bool open = LevelFlow.Unlocked(i + 2);
+            Vector2 a = nodePos[i], b = nodePos[i + 1];
+            const int dots = 6;
+            for (int k = 1; k < dots; k++)
+            {
+                float t = k / (float)dots;
+                var p = Vector2.Lerp(a, b, t) + new Vector2(0f, Mathf.Sin(t * Mathf.PI) * 0.35f);
+                var d = Ui.Spr("Dot", strip, Ui.Disc, p, Order - 5, 0.2f);
+                d.color = open ? Announcer.Cream : new Color(0.45f, 0.42f, 0.42f, 0.9f);
+            }
+        }
+    }
+
+    Transform BuildNode(LevelDef lv, Vector2 pos)
+    {
+        bool open = LevelFlow.Unlocked(lv.id);
+        int stars = LevelFlow.Stars(lv.id);
+        var n = Ui.Root("Node" + lv.id, strip, pos);
+        float size = lv.IsBoss ? 1.35f : 1f;
+        var col = LevelDB.WorldColor[lv.world];
+        var shadow = Ui.Spr("Shadow", n, Ui.Disc, new Vector2(0.06f, -0.1f), Order, size);
+        shadow.color = new Color(0f, 0f, 0f, 0.35f);
+        var disc = Ui.Spr("Disc", n, Ui.Disc, Vector2.zero, Order + 1, size);
+        disc.color = open ? (stars > 0 ? col : Color.Lerp(col, Color.white, 0.45f)) : Ui.Grey(col);
+
+        if (lv.IsBoss)
+        {
+            var icon = lv.goal >= 0 ? LevelRuntime.BossIcons[lv.goal] : LevelRuntime.BossIcons[2];
+            if (icon)
+            {
+                var sr = Ui.Spr("Boss", n, icon, new Vector2(0f, 0.05f), Order + 2, 0.95f / Mathf.Max(icon.bounds.size.x, icon.bounds.size.y));
+                if (!open) sr.color = new Color(0.25f, 0.22f, 0.22f);
+            }
+            Ui.Txt(n, lv.goal >= 0 ? "BOSS" : "FINAL", new Vector2(0f, -0.95f), 0.8f, open ? Announcer.Red : Announcer.Cream, Order + 3);
+        }
+        else
+        {
+            Ui.Txt(n, lv.id.ToString(), new Vector2(0f, 0.02f), 1.5f, open ? Ui.Ink : new Color(0.3f, 0.28f, 0.28f), Order + 3);
+            Ui.Txt(n, Short(lv.game), new Vector2(0f, -0.72f), 0.7f, open ? Color.white : new Color(0.7f, 0.68f, 0.68f), Order + 3);
+        }
+
+        // three stars on an arc above the node
+        var star = GameKit.I ? GameKit.I.parryStar : Ui.Disc;
+        for (int s = 0; s < 3; s++)
+        {
+            var p = new Vector2((s - 1) * 0.36f, size * 0.55f + 0.12f + (s == 1 ? 0.1f : 0f));
+            var sr = Ui.Spr("Star", n, star, p, Order + 4, 0.42f);
+            sr.color = s < stars ? Announcer.Yellow : new Color(0.15f, 0.12f, 0.12f, open ? 0.55f : 0.3f);
+        }
+        if (!open) Ui.Txt(n, "?", new Vector2(0.42f * size, -0.32f * size), 1f, Announcer.Cream, Order + 4);
+        return n;
+    }
+
+    static string Short(LevelGame g)
+    {
+        switch (g)
+        {
+            case LevelGame.Flappy: return "FLAP";
+            case LevelGame.Missile: return "DODGE";
+            case LevelGame.Stack: return "STACK";
+            case LevelGame.Landing: return "LAND";
+            default: return "BOSS";
+        }
+    }
+
+    PixelText starsText, coinsText;
+
+    void BuildTop()
+    {
+        top = Ui.Root("MapTop", transform);
+        var band = Ui.Ink; band.a = 0.55f;
+        Ui.Box("Bar", top, new Vector2(0f, 3.85f), new Vector2(16f, 0.75f), band, Order + 30);
+        var star = GameKit.I ? GameKit.I.parryStar : Ui.Disc;
+        Ui.Spr("StarIcon", top, star, new Vector2(-6.9f, 3.85f), Order + 31, 0.5f).color = Announcer.Yellow;
+        starsText = Ui.Txt(top, LevelFlow.TotalStars() + "/" + LevelDB.MaxStars, new Vector2(-6.5f, 3.85f), 1.1f, Color.white, Order + 31, PixelText.Align.Left);
+        Ui.Txt(top, "FLAPPY BOEING", new Vector2(0f, 3.85f), 1.2f, Announcer.Yellow, Order + 31, PixelText.Align.Center, PixelText.Effect.Boil);
+        coinsText = Ui.Txt(top, SaveSystem.Data.coins + " COINS", new Vector2(7.1f, 3.85f), 1.1f, Announcer.Yellow, Order + 31, PixelText.Align.Right);
+        Ui.Box("Foot", top, new Vector2(0f, -3.95f), new Vector2(16f, 0.5f), band, Order + 30);
+        Ui.Txt(top, "DRAG OR ARROWS: MOVE   SPACE: PLAY   FREE PLAY: 1 CLASSIC  2 ENDLESS  3 BOSS RUSH",
+            new Vector2(0f, -3.95f), 0.62f, Announcer.Cream, Order + 31);
+    }
+
+    // ---------------------------------------------------------------- input
+    void Update()
+    {
+        if (card) { CardInput(); Animate(); return; }
+
+        if (UiInput.LeftDown()) Select(selected - 1);
+        if (UiInput.RightDown()) Select(selected + 1);
+        if (UiInput.Confirm()) OpenCard(selected);
+        int m = CombatInput.ModeKey();
+        if (m > 0) { LevelFlow.FreePlay((RunMode)(m - 1)); return; }
+
+        float wheel = UiInput.Wheel();
+        if (wheel != 0f) target = Mathf.Clamp(target - wheel * 2f, minScroll, maxScroll);
+
+        if (UiInput.Down(out var p)) { pressing = true; dragging = false; pressAt = p; pressScroll = target; lastX = p.x; }
+        if (pressing && UiInput.Held(out var h))
+        {
+            if (Mathf.Abs(h.x - pressAt.x) > 0.25f) dragging = true;
+            if (dragging) target = Mathf.Clamp(pressScroll - (h.x - pressAt.x), minScroll, maxScroll);
+            lastX = h.x;
+        }
+        if (pressing && UiInput.Up(out var u))
+        {
+            pressing = false;
+            if (!dragging) Click(u);
+        }
+        Animate();
+    }
+
+    void Animate()
+    {
+        scroll = Mathf.Lerp(scroll, target, 1f - Mathf.Exp(-10f * Time.unscaledDeltaTime));
+        Apply();
+        float t = Time.unscaledTime;
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            bool sel = i == selected - 1;
+            float s = sel ? 1.12f + 0.05f * Mathf.Sin(t * 6f) : 1f;
+            nodes[i].localScale = Vector3.one * s;
+        }
+        if (plane)
+        {
+            var p = nodePos[LevelFlow.Frontier() - 1];
+            plane.localPosition = p + new Vector2(0f, 1.25f + 0.12f * Mathf.Sin(t * 3f));
+        }
+    }
+
+    void Apply() { if (strip) strip.localPosition = new Vector3(-scroll, 0f, 0f); }
+
+    void Select(int id)
+    {
+        if (id < 1 || id > LevelDB.Count || !LevelFlow.Unlocked(id)) return;
+        selected = id;
+        target = Mathf.Clamp(nodePos[id - 1].x, minScroll, maxScroll);
+        AudioManager.Sfx("card", 0.4f);
+    }
+
+    void Click(Vector2 world)
+    {
+        var local = world + new Vector2(scroll, 0f);
+        for (int i = 0; i < nodePos.Count; i++)
+        {
+            float r = LevelDB.All[i].IsBoss ? 0.75f : 0.6f;
+            if (Vector2.Distance(local, nodePos[i]) > r) continue;
+            if (!LevelFlow.Unlocked(i + 1))
+            {
+                AudioManager.Sfx("hurt", 0.4f);
+                StartCoroutine(Shake(nodes[i]));
+                return;
+            }
+            selected = i + 1;
+            OpenCard(i + 1);
+            return;
+        }
+    }
+
+    System.Collections.IEnumerator Shake(Transform t)
+    {
+        var p = t.localPosition;
+        for (float k = 0f; k < 0.3f; k += Time.unscaledDeltaTime)
+        {
+            t.localPosition = p + new Vector3(Mathf.Sin(k * 60f) * 0.08f * (1f - k / 0.3f), 0f, 0f);
+            yield return null;
+        }
+        t.localPosition = p;
+    }
+
+    // ---------------------------------------------------------------- level card
+    public void OpenCard(int id)
+    {
+        var lv = LevelDB.Get(id);
+        if (lv == null || !LevelFlow.Unlocked(id)) return;
+        cardLevel = lv;
+        AudioManager.Sfx("card", 0.7f);
+        card = Ui.Root("LevelCard", transform);
+        var dim = Ui.Ink; dim.a = 0.55f;
+        Ui.Box("Dim", card, Vector2.zero, new Vector2(20f, 12f), dim, Order + 40);
+        Ui.Plaque(card, new Vector2(0f, -0.1f), new Vector2(8.4f, 5.8f), Order + 41);
+        Ui.Txt(card, "LEVEL " + lv.id, new Vector2(0f, 2.15f), 2.2f, LevelDB.WorldColor[lv.world], Order + 42, PixelText.Align.Center, PixelText.Effect.Boil);
+        Ui.Txt(card, lv.GameName, new Vector2(0f, 1.3f), 1.2f, Announcer.Teal, Order + 42);
+        Ui.Txt(card, lv.GoalText, new Vector2(0f, 0.7f), 1.2f, Color.white, Order + 42);
+        Ui.Txt(card, Hint(lv.game), new Vector2(0f, 0.2f), 0.7f, Announcer.Cream, Order + 42);
+
+        int have = LevelFlow.Stars(id);
+        var star = GameKit.I ? GameKit.I.parryStar : Ui.Disc;
+        for (int s = 0; s < 3; s++)
+        {
+            float y = -0.35f - s * 0.45f;
+            var icon = Ui.Spr("Star", card, star, new Vector2(-2.6f, y), Order + 42, 0.4f);
+            icon.color = s < have ? Announcer.Yellow : new Color(0.3f, 0.25f, 0.22f);
+            Ui.Txt(card, (s + 1) + " STAR" + (s > 0 ? "S" : "") + ": " + lv.StarText(s), new Vector2(-2.25f, y), 0.85f,
+                s < have ? Announcer.Yellow : Color.white, Order + 42, PixelText.Align.Left);
+        }
+        playBtn = Ui.Btn(card, "PLAY", new Vector2(0f, -2.2f), new Vector2(3f, 0.95f), Announcer.Yellow, Order + 42);
+        closeBtn = Ui.Btn(card, "X", new Vector2(3.75f, 2.4f), new Vector2(0.8f, 0.8f), Announcer.Red, Order + 42);
+        cardAt = Time.unscaledTime + 0.15f;
+    }
+
+    static string Hint(LevelGame g)
+    {
+        switch (g)
+        {
+            case LevelGame.Flappy: return "TAP TO FLAP THROUGH THE GAPS";
+            case LevelGame.Boss: return "WASD MOVE  SPACE SHOOT  SHIFT DASH";
+            case LevelGame.Missile: return "A/D OR TAP SIDES TO TURN. CRASH MISSILES!";
+            case LevelGame.Stack: return "TAP TO DROP. PERFECT DROPS STAY WIDE";
+            default: return "HOLD TO CLIMB. LET GO TO SINK. LAND SOFT";
+        }
+    }
+
+    void CloseCard()
+    {
+        if (card) Destroy(card.gameObject);
+        card = null; cardLevel = null;
+    }
+
+    void CardInput()
+    {
+        if (Time.unscaledTime < cardAt) return;
+        if (UiInput.Back()) { CloseCard(); return; }
+        if (UiInput.Confirm()) { LevelFlow.Play(cardLevel.id); return; }
+        if (UiInput.Up(out var p))
+        {
+            if (playBtn.Hit(p)) { AudioManager.Sfx("ready", 0.7f); LevelFlow.Play(cardLevel.id); }
+            else if (closeBtn.Hit(p) || Mathf.Abs(p.x) > 4.2f || Mathf.Abs(p.y + 0.1f) > 2.9f) CloseCard();
+        }
+    }
+}
