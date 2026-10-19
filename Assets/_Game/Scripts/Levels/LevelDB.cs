@@ -104,20 +104,20 @@ public static class LevelDB
         L(0, LevelGame.Missile, 20, 0f, 0, 3, 6),
         L(0, LevelGame.Boss, 0, 0f, 0, 6, 9),
         // ---- world 2: sunny sea
-        L(1, LevelGame.Landing, 3, 0f, 0, 150, 220),
+        L(1, LevelGame.Landing, 3, 0f, 0, 110, 165),
         L(1, LevelGame.Missile, 25, 0.3f, 0, 4, 8),
         L(1, LevelGame.Stack, 12, 0.3f, 0, 3, 6),
         L(1, LevelGame.Flappy, 0, 0f, 15, 22, 30),
         L(1, LevelGame.Boss, 1, 0f, 0, 6, 9),
         // ---- world 3: storm peaks
-        L(2, LevelGame.Landing, 3, 0.5f, 0, 160, 230),
+        L(2, LevelGame.Landing, 3, 0.5f, 0, 100, 145),
         L(2, LevelGame.Flappy, 0, 0f, 20, 28, 36),
         L(2, LevelGame.Stack, 15, 0.6f, 0, 4, 8),
         L(2, LevelGame.Missile, 30, 0.6f, 0, 6, 10),
         L(2, LevelGame.Boss, 2, 0f, 0, 6, 9),
         // ---- world 4: sundown
         L(3, LevelGame.Missile, 40, 0.9f, 0, 8, 14),
-        L(3, LevelGame.Landing, 4, 0.8f, 0, 240, 320),
+        L(3, LevelGame.Landing, 4, 0.8f, 0, 120, 170),
         L(3, LevelGame.Stack, 20, 0.9f, 0, 6, 10),
         L(3, LevelGame.Flappy, 0, 0f, 30, 40, 50),
         L(3, LevelGame.Boss, -1, 0f, 0, 6, 9),
