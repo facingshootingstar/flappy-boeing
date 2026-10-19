@@ -81,4 +81,12 @@ Ghi lại quyết định thiết kế của mình ở cuối file này (mục E
 
 ## E. Nhật ký quyết định (Grok ghi tiếp vào đây)
 
-- …
+- Giữ nguyên loại màn 1, 2, 4, 5, 6. Màn 4 (né tên lửa) được làm dịu: tên lửa dễ chậm hơn máy bay, 0.55 giây đầu không nổ, ít tên lửa hơn. Bot sống đủ 20 giây nhưng 0 điểm vì chỉ né, không nhặt sao. Ngưỡng 3/6 điểm giữ nguyên: sống sót là 1 sao, điểm là phần thưởng. Màn xếp thùng: thùng không tràn khỏi màn, bot thả khi thùng đi qua đúng tâm.
+- Ngưỡng sao hạ cánh lấy từ lượt bot 167 điểm / 3 lần đáp. Màn 6 là 110 và 165. Màn 11 là 100 và 145. Màn 17 là 120 và 170. Boss vẫn 6/9 (4 phát trúng / 1 phát). Xếp thùng màn 2 vẫn 2/4 vì bot hoàn hảo không phải người chơi.
+- Ba mini game mới, cùng khuôn `MiniGame`, bot tự chơi được: `SupplyDrop` (thả hàng, 3 lần trượt thì thua, bắt giữa +10), `BoltLane` (3 làn, sét rơi, điểm là lần né sát), `SkyRefuel` (khớp độ cao máy bay tiếp dầu, mỗi lần tuột trừ 6 điểm, đầy bình thì thắng). Kết quả bot: màn 7 bắt 60 điểm / 3 sao, màn 12 né 9/10 / 3 sao, màn 16 tiếp dầu 100 điểm / 3 sao.
+- Biến thể `LevelTwist`: `Wind` đẩy ngang, `Night` phủ một lớp đêm (Flappy/Boss ở order 13, mini game ở trên sprite và dưới HUD), `Quota` cộng một lần phần thưởng bằng khoảng cách sao 2 và sao 3. Quota không làm thua.
+- Thế giới 5 `STARLIGHT` (màn 21–25), dùng lại bầu trời dusk. Cổng sao mỗi thế giới: 0, 6, 15, 26, 40. Thế giới 2 chỉ cần 6 sao để hai màn 3 sao đầu mở được, không khoá màn 6. `Play()` vẫn không kiểm tra khoá (để bot nhảy màn). Nút NEXT và bản đồ thì kiểm tra `Unlocked` sau khi sao đã lưu.
+- Rương mỗi 10 sao, +25 coin, bit `chestMask` trên save. Save cũ thiếu field thì mặc định 0, không tăng version. Máy bay trên bản đồ bay từ màn vừa thắng tới màn biên giới.
+- Juice dùng lại `CameraFx.Shake` và `AudioManager.Sfx` (cao độ tăng theo combo). Chữ nảy qua `PopText`. Chỉ dùng tên SFX có trong danh sách.
+- Ảnh mới vẽ bằng pixel cứng, đúng bảng màu, nằm ở `Assets/_Game/Art/props/` (rương, thùng dù, cổng, máy bay tiếp dầu). Sét dùng `Art/fx/lightning_bolt.png`. Game đọc file lúc chạy, lọc point, không sửa scene.
+- Save dev đã bị các lượt chơi thử ghi đè: `C:/Users/ADMIN/AppData/LocalLow/DefaultCompany/Flappy Boeing/save.json`. Màn 3 chưa có sao nên bản đồ khoá màn 4 dù màn 4 đã được bot chơi thẳng. Đó là luật "màn trước phải có sao", không phải lỗi tính sao.
