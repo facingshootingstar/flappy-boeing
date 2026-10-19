@@ -23,7 +23,7 @@ public class LevelRecord
 [Serializable]
 public class SaveData
 {
-    public int version = 2;
+    public int version = 3;
     public int coins;
     public int gems;
     public int pilotXp;
@@ -34,6 +34,8 @@ public class SaveData
     public List<BossRecord> bossRecords = new List<BossRecord>();
     public List<LevelRecord> levels = new List<LevelRecord>();
     public int chestMask;     // bit i set once the (i+1)*10 star chest is opened. Missing on old saves, so it stays 0.
+    public List<string> seenCutscenes = new List<string>(); // cutscene ids already watched. JsonUtility leaves this null on old files.
+    public List<string> postcards = new List<string>();     // postcard ids collected on a first clear. Same null rule.
     public bool musicOn = true;
     public float sfxVolume = 1f;
 }
@@ -113,7 +115,9 @@ public static class SaveSystem
         if (d.unlockedGames == null) d.unlockedGames = new List<string> { "flappy", "bossrush" };
         if (d.bossRecords == null) d.bossRecords = new List<BossRecord>();
         if (d.levels == null) d.levels = new List<LevelRecord>();
-        if (d.version < 2) d.version = 2;
+        if (d.seenCutscenes == null) d.seenCutscenes = new List<string>();
+        if (d.postcards == null) d.postcards = new List<string>();
+        if (d.version < 3) d.version = 3;
     }
 
     public static bool SpendCoins(int amount)
