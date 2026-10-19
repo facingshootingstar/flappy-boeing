@@ -466,7 +466,7 @@ public class LevelMap : MonoBehaviour
         panel = Ui.Root("Postcards", transform);
         var dim = Ui.Ink; dim.a = 0.62f;
         Ui.Box("Dim", panel, Vector2.zero, new Vector2(20f, 12f), dim, Order + 40);
-        Ui.Txt(panel, "POSTCARDS", new Vector2(0f, 3.12f), 1.05f, Announcer.Yellow, Order + 42, PixelText.Align.Center, PixelText.Effect.Boil);
+        Ui.Txt(panel, "POSTCARDS", new Vector2(0f, 3.34f), 1.05f, Announcer.Yellow, Order + 42, PixelText.Align.Center, PixelText.Effect.Boil);
         panelClose = Ui.Btn(panel, "X", new Vector2(6.85f, 2.4f), new Vector2(0.62f, 0.62f), Announcer.Red, Order + 42);
         var have = SaveSystem.Data.postcards;
         for (int i = 0; i < 25; i++)
