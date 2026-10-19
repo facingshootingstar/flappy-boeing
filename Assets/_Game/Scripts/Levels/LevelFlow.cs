@@ -154,7 +154,7 @@ public class LevelRuntime : MonoBehaviour
 
     public static void Ensure()
     {
-        if (FindFirstObjectByType<LevelRuntime>()) return;
+        if (FindAnyObjectByType<LevelRuntime>()) return;
         new GameObject("Levels").AddComponent<LevelRuntime>();
     }
 
@@ -166,7 +166,7 @@ public class LevelRuntime : MonoBehaviour
         if (LevelFlow.ShowMap) { OpenMap(); return; }
         if (Level == null) return;   // free play
         GameState.OnlyBoss = -1;
-        var biome = FindFirstObjectByType<BiomeDirector>();
+        var biome = FindAnyObjectByType<BiomeDirector>();
         if (biome) biome.Set(LevelDB.WorldBiome[Level.world]);
         switch (Level.game)
         {
@@ -193,17 +193,17 @@ public class LevelRuntime : MonoBehaviour
 
     static void GrabArt()
     {
-        var pc = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+        var pc = FindAnyObjectByType<PlayerController>(FindObjectsInactive.Include);
         if (pc) Fly = pc.fly;
-        var w = FindFirstObjectByType<PlayerWeapons>(FindObjectsInactive.Include);
+        var w = FindAnyObjectByType<PlayerWeapons>(FindObjectsInactive.Include);
         if (w) Rocket = w.exSprite;
-        var pool = FindFirstObjectByType<BulletPool>(FindObjectsInactive.Include);
+        var pool = FindAnyObjectByType<BulletPool>(FindObjectsInactive.Include);
         if (pool) Torpedo = pool.torpedo;
-        var dir = FindFirstObjectByType<BossDirector>(FindObjectsInactive.Include);
+        var dir = FindAnyObjectByType<BossDirector>(FindObjectsInactive.Include);
         if (dir && dir.bosses != null)
             for (int i = 0; i < dir.bosses.Length && i < 3; i++)
                 if (dir.bosses[i]) BossIcons[i] = dir.bosses[i].GetComponent<SpriteRenderer>().sprite;
-        var biome = FindFirstObjectByType<BiomeDirector>(FindObjectsInactive.Include);
+        var biome = FindAnyObjectByType<BiomeDirector>(FindObjectsInactive.Include);
         if (biome && biome.roots != null)
             for (int b = 0; b < biome.roots.Length && b < 4; b++)
             {

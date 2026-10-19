@@ -13,7 +13,7 @@ public class CargoStack : MiniGame
     class Debris { public Transform t; public Vector2 v; public float spin; }
 
     Transform stack, moving;
-    float topX, topW = MaxW, curX, curW = MaxW, dir = 1f, sway, shift;
+    float topX, topW = MaxW, curX, curW = MaxW, dir = 1f, sway, shift, prevDx = 99f;
     int placed, combo;
     readonly List<Debris> debris = new List<Debris>();
 
@@ -34,6 +34,7 @@ public class CargoStack : MiniGame
     }
 
     float Speed => 2.4f + level.hard * 2.2f + placed * 0.12f;
+    float Limit() => W - 0.35f - curW * 0.5f;   // keep the whole crate on screen
     float TopY => Base + placed * CrateH;
 
     static Color Hue(int i) => Color.HSVToRGB(Mathf.Repeat(0.08f + i * 0.07f, 1f), 0.55f, 0.95f);
@@ -51,14 +52,15 @@ public class CargoStack : MiniGame
     void NewCrate()
     {
         dir = Random.value < 0.5f ? 1f : -1f;
-        curX = -dir * (W - 1f);
+        curX = -dir * Limit();
+        prevDx = curX - topX;
         moving = MakeCrate("Crate", curW, Hue(placed), new Vector2(curX, TopY + CrateH / 2f + 0.9f), stack);
     }
 
     protected override void Tick(float dt)
     {
         // slide
-        float lim = W - 1f;
+        float lim = Limit();
         curX += dir * Speed * dt;
         if (curX > lim) { curX = lim; dir = -1f; } else if (curX < -lim) { curX = -lim; dir = 1f; }
         sway += dt;
@@ -67,7 +69,11 @@ public class CargoStack : MiniGame
         float hover = TopY + CrateH / 2f + 0.9f + Mathf.Sin(sway * 5f) * 0.05f;
         moving.localPosition = new Vector3(curX, hover, 0f);
 
-        if (Bot ? Mathf.Abs(curX - topX) < 0.07f : (TapInput.Pressed() || UiInput.Confirm())) Drop();
+        float dxNow = curX - topX;
+        // crossing the stack, not a tiny window: a fast crate used to skip the 0.07 band in one frame
+        bool botDrop = Bot && prevDx != 0f && dxNow * prevDx <= 0f;
+        prevDx = dxNow;
+        if (botDrop || (!Bot && (TapInput.Pressed() || UiInput.Confirm()))) Drop();
 
         for (int i = debris.Count - 1; i >= 0; i--)
         {
