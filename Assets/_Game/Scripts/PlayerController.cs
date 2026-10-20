@@ -28,6 +28,7 @@ public class PlayerController : MonoBehaviour
     SpriteRenderer sr;
     CapsuleCollider2D cap;
     PlayerHealth health;
+    Vector3 baseScale;
     bool combat;
     float dashT, dashReady, ghostT;
     Vector2 dashDir;
@@ -45,8 +46,31 @@ public class PlayerController : MonoBehaviour
         sr = GetComponent<SpriteRenderer>();
         cap = GetComponent<CapsuleCollider2D>();
         health = GetComponent<PlayerHealth>();
+        baseScale = transform.localScale;
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
+    }
+
+    void Start()
+    {
+        // The scene sheet is the old pixel plane. The animator reapplies it every frame until Play() swaps frames.
+        const float PoeH = 1.4f;
+        var set = PropArt.PoeSet("fly", 4, PoeH);
+        if (set != null)
+        {
+            fly = set;
+            climb = PropArt.PoeSet("climb", 1, PoeH) ?? fly;
+            dive = PropArt.PoeSet("dive", 1, PoeH) ?? fly;
+            var hitSet = PropArt.PoeSet("hit", 1, PoeH);
+            if (hitSet != null) hit = hitSet[0];
+            sr.sortingOrder = 16;
+        }
+        if (fly != null && fly.Length > 0) anim.Play(fly, 12f);
+        if (MiniGame.Bot && GameState.I != null && !GameState.I.Started)
+        {
+            GameState.I.Begin();
+            rb.gravityScale = gravityScale;
+        }
     }
 
     void OnDestroy() { if (I == this) I = null; }
@@ -77,6 +101,7 @@ public class PlayerController : MonoBehaviour
         if (combat) { CombatUpdate(); return; }
         if (!gs.Started)
         {
+            if (fly != null && fly.Length > 0) anim.Play(fly, 12f);
             transform.position = new Vector3(transform.position.x, Mathf.Sin(Time.time * 3f) * 0.25f, 0);
             if (TapInput.Pressed()) { gs.Begin(); rb.gravityScale = gravityScale; Lift(); }
             return;
@@ -85,7 +110,7 @@ public class PlayerController : MonoBehaviour
         var v = rb.linearVelocity;
         v.y = Mathf.Max(v.y, maxFall);
         rb.linearVelocity = v;
-        anim.Play(v.y > 1.5f ? climb : v.y < -2.5f ? dive : fly, v.y > 1.5f ? 10f : 8f);
+        anim.Play(v.y > 1.5f ? climb : v.y < -2.5f ? dive : fly, v.y > 1.5f ? 12f : 14f);
         if (transform.position.y > ceiling || transform.position.y < floor) Die();
     }
 
@@ -132,10 +157,29 @@ public class PlayerController : MonoBehaviour
     /// <summary>Parry refunds the dash so chains feel snappy.</summary>
     public void ResetDash() { dashReady = Time.time; }
 
+    void LateUpdate()
+    {
+        var gs = GameState.I;
+        if (gs == null || combat) return;
+        if (!gs.Alive || !gs.Started)
+        {
+            transform.rotation = Quaternion.identity;
+            transform.localScale = baseScale;
+            return;
+        }
+        float vy = rb.linearVelocity.y;
+        transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Clamp(vy * 3.4f, -28f, 34f));
+        float sy = Mathf.Clamp(1f + vy * 0.02f, 0.84f, 1.18f);
+        transform.localScale = new Vector3(baseScale.x / sy, baseScale.y * sy, baseScale.z);
+    }
+
     void Lift()
     {
         var v = rb.linearVelocity; v.y = lift; rb.linearVelocity = v;
         AudioManager.Sfx("flap", 0.5f, 0.08f);
+        if (GameKit.I != null && GameKit.I.smoke != null && GameKit.I.smoke.Length > 0)
+            GameKit.Pop(GameKit.I.smoke[0], transform.position + new Vector3(-0.72f, -0.32f, 0f), 0.32f, 0.55f, 0.9f, 9,
+                new Color(1f, 0.96f, 0.9f, 0.75f));
     }
 
     void OnTriggerEnter2D(Collider2D other) { Touch(other); }
