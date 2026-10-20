@@ -26,7 +26,7 @@ public class LevelMap : MonoBehaviour
     float pressScroll, lastX;
 
     LevelDef cardLevel;
-    Ui.Button playBtn, closeBtn, storyBtn, postBtn, panelClose, prevBtn, nextBtn;
+    Ui.Button playBtn, closeBtn, storyBtn, postBtn, menuBtn, panelClose, prevBtn, nextBtn;
     float cardAt;
     Transform panel;
     bool postcardsMode;
@@ -79,7 +79,9 @@ public class LevelMap : MonoBehaviour
     void BuildWorld(int w)
     {
         float cx = w * Segment + Segment / 2f;
-        var sky = LevelRuntime.Skies[LevelDB.WorldBiome[w]];
+        string[] paintedNames = { "sky_dawn", "sky_sea", "sky_storm", "sky_sundown", "sky_star" };
+        var painted = PropArt.Imagen(paintedNames[w], 15f, true);
+        var sky = painted ? painted : LevelRuntime.Skies[LevelDB.WorldBiome[w]];
         if (sky)
         {
             var sr = Ui.Spr("Sky" + w, strip, sky, new Vector2(cx, 0f), Order - 20);
@@ -87,13 +89,16 @@ public class LevelMap : MonoBehaviour
         }
         else Ui.Box("Sky" + w, strip, new Vector2(cx, 0f), new Vector2(Segment, 8.6f), LevelDB.WorldColor[w], Order - 20);
 
-        // rolling ground band so nodes sit on a landscape
-        var ground = Color.Lerp(LevelDB.WorldColor[w], new Color(0.25f, 0.45f, 0.3f), 0.55f);
-        for (int k = 0; k < 16; k++)
+        // Hills only when the sky is still a flat biome plate. An Imagine sky already has its own ground.
+        if (!painted)
         {
-            float x = w * Segment + k + 0.5f;
-            float h = 1.1f + 0.25f * Mathf.Sin((w * Segment + k) * 0.9f);
-            Ui.Box("Hill", strip, new Vector2(x, -4.2f + h / 2f), new Vector2(1.02f, h), ground, Order - 18);
+            var ground = Color.Lerp(LevelDB.WorldColor[w], new Color(0.25f, 0.45f, 0.3f), 0.55f);
+            for (int k = 0; k < 16; k++)
+            {
+                float x = w * Segment + k + 0.5f;
+                float h = 1.1f + 0.25f * Mathf.Sin((w * Segment + k) * 0.9f);
+                Ui.Box("Hill", strip, new Vector2(x, -4.2f + h / 2f), new Vector2(1.02f, h), ground, Order - 18);
+            }
         }
         var c = LevelDB.WorldColor[w];
         Ui.Txt(strip, "WORLD " + (w + 1), new Vector2(cx, 2.85f), 1f, Announcer.Cream, Order - 10);
@@ -200,6 +205,7 @@ public class LevelMap : MonoBehaviour
         Ui.Txt(top, CutsceneDB.Title, new Vector2(0f, 3.85f), 1.15f, Announcer.Yellow, Order + 31, PixelText.Align.Center, PixelText.Effect.Boil);
         coinsText = Ui.Txt(top, SaveSystem.Data.coins + " COINS", new Vector2(7.1f, 3.85f), 1.1f, Announcer.Yellow, Order + 31, PixelText.Align.Right);
         storyBtn = Ui.Btn(top, "STORY", new Vector2(-6.15f, 3.2f), new Vector2(2.15f, 0.48f), Announcer.Cream, Order + 31);
+        menuBtn = Ui.Btn(top, "MENU", new Vector2(-6.15f, 2.55f), new Vector2(2.15f, 0.48f), Announcer.Cream, Order + 31);
         postBtn = Ui.Btn(top, "POSTCARDS", new Vector2(5.45f, 3.2f), new Vector2(3.4f, 0.48f), Announcer.Cream, Order + 31);
         Ui.Box("Foot", top, new Vector2(0f, -3.95f), new Vector2(16f, 0.5f), band, Order + 30);
         Ui.Txt(top, "DRAG OR ARROWS: MOVE   SPACE: PLAY   FREE PLAY: 1 CLASSIC  2 ENDLESS  3 BOSS RUSH",
@@ -234,7 +240,8 @@ public class LevelMap : MonoBehaviour
             pressing = false;
             if (!dragging)
             {
-                if (storyBtn.Hit(u)) OpenStories();
+                if (menuBtn.Hit(u)) { LevelFlow.Menu(); return; }
+                else if (storyBtn.Hit(u)) OpenStories();
                 else if (postBtn.Hit(u)) OpenPostcards();
                 else Click(u);
             }
@@ -396,10 +403,10 @@ public class LevelMap : MonoBehaviour
             case LevelGame.Flappy: return "TAP TO FLAP THROUGH THE GAPS";
             case LevelGame.Boss: return "WASD MOVE  SPACE SHOOT  SHIFT DASH";
             case LevelGame.Missile: return "A/D OR TAP SIDES TO TURN. CRASH MISSILES!";
-            case LevelGame.Stack: return "TAP TO DROP. PERFECT DROPS STAY WIDE";
+            case LevelGame.Stack: return "PACK THE MAIL BEFORE THE BOAT SAILS";
             case LevelGame.Supply: return "A/D OR TAP TO CATCH THE CRATE";
-            case LevelGame.Bolt: return "A/D OR TAP TO SWITCH LANE";
-            case LevelGame.Refuel: return "A/D OR TAP TO MATCH THE TANKER";
+            case LevelGame.Bolt: return "POE IS GROUNDED. JUMP THE GAPS.";
+            case LevelGame.Refuel: return "STAY LEVEL WITH BUBBA TO TAKE FUEL";
             default: return "HOLD TO CLIMB. LET GO TO SINK. LAND SOFT";
         }
     }
@@ -477,7 +484,7 @@ public class LevelMap : MonoBehaviour
             if (got)
             {
                 var pic = CutscenePlayer.LoadArt(pid);
-                if (pic) Ui.Spr("Pc", panel, pic, pos, Order + 42, 0.32f);
+                if (pic) Ui.Spr("Pc", panel, pic, pos, Order + 42, CutscenePlayer.Fit(pic, 1.45f));
             }
             else
             {

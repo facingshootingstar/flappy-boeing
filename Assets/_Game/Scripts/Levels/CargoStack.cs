@@ -13,11 +13,12 @@ public class CargoStack : MiniGame
     class Debris { public Transform t; public Vector2 v; public float spin; }
 
     Transform stack, moving;
-    float topX, topW = MaxW, curX, curW = MaxW, dir = 1f, sway, shift, prevDx = 99f;
+    SpriteRenderer pilotSr;
+    float topX, topW = MaxW, curX, curW = MaxW, dir = 1f, sway, shift, prevDx = 99f, cheer;
     int placed, combo;
     readonly List<Debris> debris = new List<Debris>();
 
-    protected override string HintText => "TAP TO DROP THE CRATE - LINE IT UP!";
+    protected override string HintText => "PACK THE MAIL BEFORE THE BOAT SAILS";
 
     protected override void Build()
     {
@@ -29,6 +30,8 @@ public class CargoStack : MiniGame
         for (int i = -3; i <= 3; i++)
             Ui.Box("Port", stack, new Vector2(i * 0.95f, Base - 0.65f), new Vector2(0.26f, 0.26f), new Color32(255, 230, 150, 255), Order + 1);
         topX = 0f; topW = MaxW; curW = MaxW;
+        var idle = PropArt.Imagen("pilot_idle", 1.65f);
+        if (idle) pilotSr = Ui.Spr("Pilot", stack, idle, new Vector2(-2.55f, Base + 0.82f), Order + 3);
         NewCrate();
         Hud("CRATES 0/" + level.goal, "PERFECT 0");
     }
@@ -46,6 +49,8 @@ public class CargoStack : MiniGame
         Ui.Box("Body", t, new Vector2(0f, -0.02f), new Vector2(w - 0.08f, CrateH - 0.1f), c, Order + 5);
         Ui.Box("Shine", t, new Vector2(0f, CrateH / 2f - 0.1f), new Vector2(w - 0.16f, 0.05f), Color.Lerp(c, Color.white, 0.55f), Order + 6);
         if (w > 0.5f) Ui.Box("Strap", t, new Vector2(0f, -0.02f), new Vector2(0.08f, CrateH - 0.1f), Color.Lerp(c, Ui.Ink, 0.45f), Order + 6);
+        var stamp = PropArt.Imagen("crate", CrateH * 0.72f);
+        if (stamp && w > 0.7f) Ui.Spr("Stamp", t, stamp, Vector2.zero, Order + 7);
         return t;
     }
 
@@ -74,6 +79,18 @@ public class CargoStack : MiniGame
         bool botDrop = Bot && prevDx != 0f && dxNow * prevDx <= 0f;
         prevDx = dxNow;
         if (botDrop || (!Bot && (TapInput.Pressed() || UiInput.Confirm()))) Drop();
+        if (cheer > 0f && pilotSr)
+        {
+            cheer -= dt;
+            float puff = Mathf.Clamp01(cheer / 0.14f);
+            pilotSr.transform.localScale = Vector3.one * (1f + 0.14f * puff);
+            if (cheer <= 0f)
+            {
+                var back = PropArt.Imagen("pilot_idle", 1.65f);
+                if (back) pilotSr.sprite = back;
+                pilotSr.transform.localScale = Vector3.one;
+            }
+        }
 
         for (int i = debris.Count - 1; i >= 0; i--)
         {
@@ -90,6 +107,12 @@ public class CargoStack : MiniGame
         float dx = curX - topX;
         float y = TopY + CrateH / 2f;
         var c = Hue(placed);
+        if (pilotSr)
+        {
+            var lift = PropArt.Imagen("pilot_lift", 1.65f);
+            if (lift) pilotSr.sprite = lift;
+            cheer = 0.14f;
+        }
         Destroy(moving.gameObject);
         if (Mathf.Abs(dx) >= topW)
         {

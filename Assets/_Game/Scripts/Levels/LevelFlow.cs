@@ -12,11 +12,13 @@ public static class LevelFlow
 {
     public static LevelDef Current;
     public static bool ShowMap = true;
+    /// <summary>True until PLAY. Scene reloads keep it, so a finished level returns to the map.</summary>
+    public static bool AtMenu = true;
     /// <summary>Map node to centre on next time the map opens.</summary>
     public static int Focus;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { Current = null; ShowMap = true; Focus = 0; }
+    static void ResetStatics() { Current = null; ShowMap = true; Focus = 0; AtMenu = true; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
@@ -97,6 +99,7 @@ public static class LevelFlow
         Current = lv;
         Focus = id;
         ShowMap = false;
+        AtMenu = false;
         Last = null;
         GameState.CheckpointBoss = -1;
         Reload();
@@ -115,11 +118,22 @@ public static class LevelFlow
         return true;
     }
 
+    public static void Menu()
+    {
+        AtMenu = true;
+        Current = null;
+        ShowMap = true;
+        GameState.CheckpointBoss = -1;
+        GameState.Mode = RunMode.Classic;
+        Reload();
+    }
+
     public static void Map()
     {
         if (Current != null) Focus = Current.id;
         Current = null;
         ShowMap = true;
+        AtMenu = false;
         GameState.CheckpointBoss = -1;
         GameState.Mode = RunMode.Classic;
         Reload();
@@ -210,9 +224,8 @@ public class LevelRuntime : MonoBehaviour
         Level = LevelFlow.Current;
         if (LevelFlow.ShowMap)
         {
-            OpenMap();
-            if (!CutscenePlayer.Seen("intro"))
-                CutscenePlayer.Play("intro", () => FilmFilter.IrisOpen(0.55f));
+            if (LevelFlow.AtMenu && !MiniGame.Bot && !CutscenePlayer.SkipAll) OpenMenu();
+            else OpenMap();
             return;
         }
         if (Level == null) return;   // free play
@@ -237,6 +250,8 @@ public class LevelRuntime : MonoBehaviour
                 }
                 break;
         }
+        if (Level.game == LevelGame.Flappy || Level.game == LevelGame.Boss)
+            PaintSky(Level.world);
         if (Level.twist == LevelTwist.Night && (Level.game == LevelGame.Flappy || Level.game == LevelGame.Boss))
             Ui.Box("Night", transform, Vector2.zero, new Vector2(20f, 12f), new Color(0.02f, 0.03f, 0.1f, 0.34f), 13);
         if (Level.id == 25) StartCoroutine(DrainLight());
@@ -275,7 +290,20 @@ public class LevelRuntime : MonoBehaviour
     static void GrabArt()
     {
         var pc = FindAnyObjectByType<PlayerController>(FindObjectsInactive.Include);
-        if (pc) Fly = pc.fly;
+        if (pc)
+        {
+            var poe = PropArt.Imagen("poe", 1.15f);
+            if (poe)
+            {
+                pc.fly = new[] { poe };
+                pc.climb = new[] { PropArt.Imagen("poe_climb", 1.15f) ?? poe };
+                pc.dive = new[] { PropArt.Imagen("poe_dive", 1.15f) ?? poe };
+                pc.hit = poe;
+                var body = pc.GetComponent<SpriteRenderer>();
+                if (body) body.sprite = poe;
+            }
+            Fly = pc.fly;
+        }
         var w = FindAnyObjectByType<PlayerWeapons>(FindObjectsInactive.Include);
         if (w) Rocket = w.exSprite;
         var pool = FindAnyObjectByType<BulletPool>(FindObjectsInactive.Include);
@@ -300,12 +328,38 @@ public class LevelRuntime : MonoBehaviour
             if (System.Array.IndexOf(names, go.name) >= 0) go.SetActive(on);
     }
 
-    void OpenMap()
+    public void OpenMenu()
+    {
+        HideShell();
+        FilmFilter.IrisSet(FilmFilter.IrisOpenRadius);
+        if (!GetComponent<FrontMenu>()) gameObject.AddComponent<FrontMenu>();
+    }
+
+    public void OpenMap()
+    {
+        HideShell();
+        FilmFilter.IrisSet(1f);
+        if (!GetComponent<LevelMap>()) gameObject.AddComponent<LevelMap>();
+        if (!CutscenePlayer.Seen("intro"))
+            CutscenePlayer.Play("intro", () => FilmFilter.IrisOpen(0.55f));
+    }
+
+    /// <summary>Imagine sky over the scene plate. Order 5: above parallax, under birds and Poe at 10.</summary>
+    void PaintSky(int world)
+    {
+        string[] names = { "sky_dawn", "sky_sea", "sky_storm", "sky_sundown", "sky_star" };
+        var sky = PropArt.Imagen(names[Mathf.Clamp(world, 0, names.Length - 1)], 15f, true);
+        var cam = Camera.main;
+        if (!sky || !cam) return;
+        // Child at local zero sits on the camera and gets clipped. Push it onto the play plane (camera z is behind 0).
+        var plate = Ui.Spr("ImagineSky", cam.transform, sky, Vector2.zero, 5);
+        plate.transform.localPosition = new Vector3(0f, 0f, -cam.transform.position.z);
+    }
+
+    void HideShell()
     {
         foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects())
             if (System.Array.IndexOf(KeepOnMap, go.name) < 0) go.SetActive(false);
-        FilmFilter.IrisSet(1f);
-        gameObject.AddComponent<LevelMap>();
     }
 
     // ---------------------------------------------------------------- flappy / boss endings
@@ -370,7 +424,7 @@ public class LevelRuntime : MonoBehaviour
         {
             var drop = Ui.Root("Postcard", transform);
             var pic = CutscenePlayer.LoadArt(CutsceneDB.PostcardId(o.level.id));
-            if (pic) Ui.Spr("Pic", drop, pic, new Vector2(0f, 0.45f), 200, 0.7f);
+            if (pic) Ui.Spr("Pic", drop, pic, new Vector2(0f, 0.45f), 200, CutscenePlayer.Fit(pic, 4.2f));
             Ui.Txt(drop, CutsceneDB.PostcardLine(o.level.id), new Vector2(0f, -1.35f), 0.7f, Announcer.Cream, 201);
             AudioManager.Sfx("card", 0.7f);
             yield return new WaitForSecondsRealtime(1.5f);

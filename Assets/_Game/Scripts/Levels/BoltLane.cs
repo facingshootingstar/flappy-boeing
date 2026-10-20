@@ -1,132 +1,226 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Switch lanes under falling bolts. Score counts bolts passed in the neighbouring lane. One hit fails.</summary>
+/// <summary>
+/// Side-scroll mail dash. The storm keeps Poe down, so the pilot runs the sack.
+/// Score is letters. Crossing <see cref="LevelDef.goal"/> gaps clears the run.
+/// </summary>
 public class BoltLane : MiniGame
 {
-    static readonly float[] LaneX = { -2.6f, 0f, 2.6f };
-    const float PlaneY = -2.4f;
+    const float Ground = -1.65f;
+    const float Gravity = 32f;
+    const float JumpV = 13f;
 
-    class Bolt { public Transform t; public int lane; public float y, hold; public bool armed; }
+    class Plat { public float x, w, y; public int island; }
+    class Pick { public float x, y; public bool got; public Transform t; }
 
-    Transform plane;
-    readonly List<Bolt> bolts = new List<Bolt>();
-    int lane = 1, passed, edge;
-    float nextIn = 0.4f;
+    Transform world, body;
+    Sprite runSpr, jumpSpr;
+    readonly List<Plat> plats = new List<Plat>();
+    readonly List<Pick> letters = new List<Pick>();
+    readonly List<Pick> zaps = new List<Pick>();
+    float px, py, vy, cam, coyote, courseEnd, gapW;
+    int crossed;
+    bool onGround, faceRight = true;
 
-    protected override string HintText => "A/D OR TAP TO SWITCH LANE";
+    protected override string HintText => "A/D: RUN   SPACE: JUMP";
 
     protected override void Build()
     {
-        for (int i = 0; i < 3; i++)
+        // ponytail: the painted sky stays glued to the screen. A second wide plate would scroll it.
+        world = Ui.Root("World", root);
+        runSpr = PropArt.Imagen("pilot_run", 1.55f);
+        jumpSpr = PropArt.Imagen("pilot_jump", 1.55f) ?? runSpr;
+        var plank = PropArt.Imagen("dock_plank", 0.7f);
+        var mail = PropArt.Imagen("mail_letter", 0.46f);
+        var box = PropArt.Imagen("mail_box", 1.25f);
+        var bolt = PropArt.Imagen("storm_bolt", 1.05f) ?? PropArt.Bolt;
+        if (!runSpr) runSpr = Ui.Disc;
+        if (!jumpSpr) jumpSpr = runSpr;
+        if (!plank) plank = Ui.Pixel;
+        if (!mail) mail = Ui.Disc;
+        if (!box) box = Ui.Disc;
+
+        gapW = Mathf.Lerp(1.85f, 2.7f, level.hard);
+        int islands = level.goal + 1;
+        int left = level.stars[2];
+        float x = 0f;
+        for (int i = 0; i < islands; i++)
         {
-            Ui.Box("Lane", root, new Vector2(LaneX[i], -0.35f), new Vector2(1.45f, 7.5f), new Color(0.02f, 0.03f, 0.08f, 0.35f), Order);
-            Ui.Box("Tick", root, new Vector2(LaneX[i], -3.45f), new Vector2(0.85f, 0.1f), Announcer.Cream, Order + 1);
+            bool hazard = i > 0 && i < level.goal && (i % 2 == 0);
+            float w = i == 0 ? 9f : hazard ? 11.5f : 8.2f;
+            AddPlat(plank, x, w, Ground, i);
+            int slots = islands - 1 - i;
+            int here = 0;
+            if (left > 0 && slots > 0)
+                here = slots == 1 ? left : Mathf.Max(1, left / slots);
+            here = Mathf.Min(here, left);
+            float zapX = x + 4.6f;
+            for (int k = 0; k < here; k++)
+            {
+                float lx = x + w * (0.55f + 0.2f * k);
+                if (hazard && Mathf.Abs(lx - zapX) < 1.3f) lx = zapX + 2.4f;
+                var sr = Spr(mail, "Letter", lx, Ground + 0.48f, Order + 5);
+                letters.Add(new Pick { x = lx, y = Ground + 0.48f, t = sr.transform });
+                left--;
+            }
+            if (hazard)
+            {
+                var zs = Spr(bolt, "Zap", zapX, Ground + 0.58f, Order + 6);
+                zaps.Add(new Pick { x = zapX, y = Ground + 0.58f, t = zs.transform });
+            }
+            x += w;
+            if (i < islands - 1)
+            {
+                var pit = new Color(0.05f, 0.04f, 0.07f, 0.94f);
+                Ui.Box("Pit", world, new Vector2(x + gapW * 0.5f, Ground - 1.7f), new Vector2(gapW + 0.15f, 3.5f), pit, Order + 1);
+                x += gapW;
+            }
         }
-        var fly = LevelRuntime.Fly;
-        var sr = Ui.Spr("Plane", root, fly != null && fly.Length > 0 ? fly[0] : Ui.Disc, new Vector2(LaneX[1], PlaneY), Order + 6, 0.65f);
-        if (fly != null && fly.Length > 1) sr.gameObject.AddComponent<SpriteAnimator>().frames = fly;
-        plane = sr.transform;
-        Hud("BOLTS 0/" + level.goal, "CLOSE 0");
+        courseEnd = x - 0.3f;
+        float flag = x - 1.35f;
+        Spr(box, "Goal", flag, Ground + BoxLift(box), Order + 5);
+        if (left != 0) Debug.LogError("[BoltLane] letters short by " + left);
+        if (gapW + 0.95f > 6.1f * (2f * JumpV / Gravity)) Debug.LogError("[BoltLane] gap wider than a jump");
+
+        body = Ui.Spr("Pilot", root, runSpr, Vector2.zero, Order + 8, runSpr == Ui.Disc ? 0.7f : 1f).transform;
+        px = 1.7f;
+        py = Ground;
+        onGround = true;
+        coyote = 0.12f;
+        Place();
+        Hud("GAPS 0/" + level.goal, "MAIL 0");
+    }
+
+    static float BoxLift(Sprite s) => s == Ui.Disc ? 0.55f : s.bounds.extents.y;
+
+    SpriteRenderer Spr(Sprite s, string name, float x, float y, int order)
+    {
+        float sc = s == Ui.Disc || s == PropArt.Bolt ? 0.45f : 1f;
+        return Ui.Spr(name, world, s, new Vector2(x, y), order, sc);
+    }
+
+    void AddPlat(Sprite plank, float x, float w, float top, int island)
+    {
+        plats.Add(new Plat { x = x, w = w, y = top, island = island });
+        if (island >= 0)
+            Ui.Box("Fill", world, new Vector2(x + w * 0.5f, top - 1.45f), new Vector2(w, 2.9f), new Color(0.42f, 0.28f, 0.16f, 1f), Order + 2);
+        bool raw = plank == Ui.Pixel;
+        float tile = raw ? 1.4f : Mathf.Max(0.4f, plank.bounds.size.x);
+        int n = Mathf.Max(1, Mathf.RoundToInt(w / tile));
+        float step = w / n;
+        float half = raw ? 0.28f : plank.bounds.extents.y;
+        for (int i = 0; i < n; i++)
+        {
+            var sr = Ui.Spr("Plank", world, plank, new Vector2(x + step * (i + 0.5f), top - half * 0.45f), Order + 3, 1f);
+            sr.transform.localScale = raw
+                ? new Vector3(step, 0.56f, 1f)
+                : new Vector3(step / tile, 1f, 1f);
+            sr.color = Color.white;
+        }
     }
 
     protected override void Tick(float dt)
     {
-        if (Bot)
+        float dir = Bot ? 1f : Steer();
+        float spd = Mathf.Lerp(6.1f, 7.3f, level.hard);
+        px = Mathf.Clamp(px + dir * spd * dt, 0.45f, courseEnd);
+        if (dir < -0.1f) faceRight = false;
+        else if (dir > 0.1f) faceRight = true;
+
+        bool hop = Bot ? BotHop() : (coyote > 0f && (UiInput.Confirm() || UiInput.UpDown() || UiInput.Down(out _)));
+        if (hop && coyote > 0f)
         {
-            int want = BotWant();
-            if (want != lane) lane += want > lane ? 1 : -1;
+            vy = JumpV;
+            coyote = 0f;
+            onGround = false;
+            AudioManager.Sfx("flap", 0.45f, 0.06f, 0.08f);
+        }
+        vy -= Gravity * dt;
+        float next = py + vy * dt;
+        if (Feet(next, out var stood))
+        {
+            onGround = true;
+            py = stood.y;
+            vy = 0f;
+            coyote = 0.12f;
+            if (stood.island > crossed) crossed = stood.island;
         }
         else
         {
-            float s = Steer();
-            int d = s < 0f ? -1 : s > 0f ? 1 : 0;
-            if (d != 0 && d != edge) lane = Mathf.Clamp(lane + d, 0, 2);
-            edge = d;
-        }
-        plane.localPosition = new Vector3(LaneX[lane], PlaneY, 0f);
-
-        int cap = level.hard < 0.45f ? 1 : 2;
-        nextIn -= dt;
-        if (nextIn <= 0f && bolts.Count < cap && passed + bolts.Count < level.goal)
-        {
-            nextIn = Mathf.Lerp(1.25f, 0.72f, level.hard);
-            Spawn();
+            onGround = false;
+            py = next;
+            coyote = Mathf.Max(0f, coyote - dt);
         }
 
-        float speed = Mathf.Lerp(3.5f, 5.4f, level.hard);
-        for (int i = bolts.Count - 1; i >= 0; i--)
+        if (py < Ground - 2.6f)
         {
-            var b = bolts[i];
-            if (b.hold > 0f)
+            Boom(new Vector2(px - cam, py), 1.1f);
+            body.gameObject.SetActive(false);
+            End(false);
+            return;
+        }
+        foreach (var z in zaps)
+        {
+            if (Mathf.Abs(px - z.x) < 0.46f && py < z.y + 0.35f && py + 1.25f > z.y - 0.7f)
             {
-                b.hold -= dt;
-                b.t.localPosition = new Vector3(LaneX[b.lane], b.y, 0f);
-                continue;
-            }
-            if (!b.armed)
-            {
-                b.armed = true;
-                b.t.GetComponent<SpriteRenderer>().color = Color.white;
-            }
-            b.y -= speed * dt;
-            b.t.localPosition = new Vector3(LaneX[b.lane], b.y, 0f);
-            if (b.y > PlaneY + 0.35f) continue;
-            if (b.lane == lane)
-            {
-                Boom(new Vector2(LaneX[lane], PlaneY), 1.2f);
-                plane.gameObject.SetActive(false);
+                Boom(new Vector2(px - cam, py + 0.5f), 1.05f);
+                body.gameObject.SetActive(false);
                 End(false);
                 return;
             }
-            if (Mathf.Abs(b.lane - lane) == 1)
-            {
-                score++;
-                PopText("CLOSE!", new Vector2(LaneX[b.lane], -1.15f), score);
-                if (score >= 3) GrantQuota();
-            }
-            Destroy(b.t.gameObject);
-            bolts.RemoveAt(i);
-            passed++;
-            Hud("BOLTS " + passed + "/" + level.goal, "CLOSE " + score);
-            if (passed >= level.goal) { End(true); return; }
         }
-        Hud("BOLTS " + passed + "/" + level.goal, "CLOSE " + score);
-    }
-
-    void Spawn()
-    {
-        int pick = Random.Range(0, 3);
-        var sr = Ui.Spr("Bolt", root, PropArt.Bolt, new Vector2(LaneX[pick], 3.55f), Order + 5, 0.42f);
-        sr.color = new Color(1f, 1f, 1f, 0.4f);
-        bolts.Add(new Bolt { t = sr.transform, lane = pick, y = 3.55f, hold = 0.4f });
-        AudioManager.Sfx("thunder", 0.28f, 0.04f, 0.08f);
-    }
-
-    int BotWant()
-    {
-        float nearest = 99f;
-        bool threat = false;
-        foreach (var b in bolts)
+        foreach (var m in letters)
         {
-            if (b.lane != lane || b.y < PlaneY) continue;
-            threat = true;
-            if (b.y < nearest) nearest = b.y;
+            if (m.got) continue;
+            if (Mathf.Abs(px - m.x) > 0.62f || Mathf.Abs(py + 0.75f - m.y) > 1.15f) continue;
+            m.got = true;
+            score++;
+            m.t.gameObject.SetActive(false);
+            PopText("MAIL!", new Vector2(m.x - cam, m.y + 0.4f), score);
+            Sparkle(new Vector2(m.x - cam, m.y), Announcer.Yellow, 0.7f);
+            if (score >= 3) GrantQuota();
         }
-        if (!threat || nearest > 2.6f) return lane;
-        for (int step = 1; step <= 2; step++)
-        {
-            int left = lane - step, right = lane + step;
-            if (left >= 0 && Safe(left)) return left;
-            if (right <= 2 && Safe(right)) return right;
-        }
-        return lane;
+
+        cam = Mathf.Lerp(cam, Mathf.Max(0f, px - 1.5f), 1f - Mathf.Exp(-8f * dt));
+        world.localPosition = new Vector3(-cam, 0f, 0f);
+        Place();
+        Hud("GAPS " + Mathf.Min(crossed, level.goal) + "/" + level.goal, "MAIL " + score);
+        if (crossed >= level.goal) End(true);
     }
 
-    bool Safe(int ln)
+    bool Feet(float next, out Plat stood)
     {
-        foreach (var b in bolts)
-            if (b.lane == ln && b.y > PlaneY && b.y < 3.2f) return false;
-        return true;
+        stood = null;
+        float best = -999f;
+        foreach (var p in plats)
+        {
+            if (px < p.x + 0.12f || px > p.x + p.w - 0.12f) continue;
+            if (py < p.y - 0.05f || next > p.y + 0.12f || vy > 0.35f) continue;
+            if (p.y > best) { best = p.y; stood = p; }
+        }
+        return stood != null;
+    }
+
+    bool BotHop()
+    {
+        if (coyote <= 0f) return false;
+        foreach (var z in zaps)
+            if (z.x - px < 1.35f && z.x - px > 0.9f) return true;
+        foreach (var p in plats)
+        {
+            if (p.island < 0 || px < p.x || px > p.x + p.w) continue;
+            float end = p.x + p.w;
+            return end - px < 0.9f && end - px > 0.4f;
+        }
+        return false;
+    }
+
+    void Place()
+    {
+        var sr = body.GetComponent<SpriteRenderer>();
+        sr.sprite = onGround || coyote > 0.02f ? runSpr : jumpSpr;
+        body.localPosition = new Vector3(px - cam, py + (sr.sprite == Ui.Disc ? 0.45f : 0.5f), 0f);
+        body.localScale = new Vector3(faceRight ? 1f : -1f, 1f, 1f);
     }
 }

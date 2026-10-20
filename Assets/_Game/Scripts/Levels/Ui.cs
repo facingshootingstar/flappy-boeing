@@ -210,6 +210,8 @@ public static class UiInput
     }
     public static bool LeftDown() => K(Key.LeftArrow, Key.A);
     public static bool RightDown() => K(Key.RightArrow, Key.D);
+    public static bool UpDown() => K(Key.UpArrow, Key.W);
+    public static bool DownDown() => K(Key.DownArrow, Key.S);
     public static bool Confirm() => K(Key.Enter, Key.Space);
     public static bool Back() => K(Key.Escape, Key.Backspace);
     public static bool RetryKey() => K(Key.R);
@@ -217,6 +219,8 @@ public static class UiInput
 #else
     public static bool LeftDown() => Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
     public static bool RightDown() => Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
+    public static bool UpDown() => Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W);
+    public static bool DownDown() => Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S);
     public static bool Confirm() => Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space);
     public static bool Back() => Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace);
     public static bool RetryKey() => Input.GetKeyDown(KeyCode.R);

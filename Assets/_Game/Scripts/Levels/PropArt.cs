@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -5,6 +6,22 @@ using UnityEngine;
 public static class PropArt
 {
     static Sprite chest, chute, gate, tanker, bolt;
+    static readonly Dictionary<string, Sprite> imagen = new Dictionary<string, Sprite>();
+
+    /// <summary>Imagine PNG in Art/imagen. worldSize is the sprite height, or the width when wide. Null if the file is missing.</summary>
+    public static Sprite Imagen(string name, float worldSize, bool wide = false)
+    {
+        string key = name + (wide ? "w" : "h") + worldSize.ToString("0.##");
+        if (imagen.TryGetValue(key, out var cached)) return cached;
+        string path = Path.Combine(Application.dataPath, "_Game", "Art", "imagen", name + ".png");
+        if (!File.Exists(path)) return null;
+        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+        if (!tex.LoadImage(File.ReadAllBytes(path))) return null;
+        float ppu = (wide ? tex.width : tex.height) / Mathf.Max(0.01f, worldSize);
+        var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), ppu);
+        imagen[key] = sprite;
+        return sprite;
+    }
 
     public static Sprite Chest => chest ? chest : (chest = Load("props/chest.png"));
     public static Sprite Chute => chute ? chute : (chute = Load("props/crate_chute.png"));

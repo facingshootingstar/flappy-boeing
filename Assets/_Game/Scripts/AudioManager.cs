@@ -61,9 +61,15 @@ public class AudioManager : MonoBehaviour
         var s = I.pool[I.next];
         I.next = (I.next + 1) % I.pool.Length;
         s.clip = clip;
-        s.volume = volume * I.sfxVolume;
+        s.volume = volume * I.sfxVolume * Mathf.Clamp01(SaveSystem.Data.sfxVolume);
         s.pitch = pitch * (1f + Random.Range(-pitchVar, pitchVar));
         s.Play();
+    }
+
+    public static void ApplyMix()
+    {
+        if (I == null || I.musicA == null || !I.musicA.isPlaying) return;
+        I.musicA.volume = SaveSystem.Data.musicOn ? I.musicVolume : 0f;
     }
 
     public static void Music(string name, float fadeTime = 1f)
@@ -82,7 +88,8 @@ public class AudioManager : MonoBehaviour
     public static void Duck(float level, float time = 0.3f)
     {
         if (I == null) return;
-        I.StartCoroutine(I.DuckTo(level * I.musicVolume, time));
+        float gain = SaveSystem.Data.musicOn ? I.musicVolume : 0f;
+        I.StartCoroutine(I.DuckTo(level * gain, time));
     }
 
     IEnumerator DuckTo(float target, float time)
@@ -96,18 +103,19 @@ public class AudioManager : MonoBehaviour
     {
         // musicA is always the live track
         var tmp = musicA; musicA = musicB; musicB = tmp;
+        float gain = SaveSystem.Data.musicOn ? musicVolume : 0f;
         if (clip != null) { musicA.clip = clip; musicA.volume = 0f; musicA.Play(); }
         float fromB = musicB.volume, t = 0f;
         while (t < time)
         {
             t += Time.unscaledDeltaTime;
             float k = Mathf.Clamp01(t / time);
-            if (clip != null) musicA.volume = k * musicVolume;
+            if (clip != null) musicA.volume = k * gain;
             musicB.volume = fromB * (1f - k);
             yield return null;
         }
         musicB.Stop();
-        if (clip != null) musicA.volume = musicVolume;
+        if (clip != null) musicA.volume = gain;
         fade = null;
     }
 }

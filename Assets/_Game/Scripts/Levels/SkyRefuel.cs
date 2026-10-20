@@ -8,7 +8,7 @@ public class SkyRefuel : MiniGame
     int slips;
     bool linked = true;
 
-    protected override string HintText => "A/D OR TAP TO MATCH THE TANKER";
+    protected override string HintText => "STAY LEVEL WITH BUBBA TO TAKE FUEL";
 
     protected override void Build()
     {
@@ -16,7 +16,8 @@ public class SkyRefuel : MiniGame
         var sr = Ui.Spr("Me", root, fly != null && fly.Length > 0 ? fly[0] : Ui.Disc, new Vector2(-2.2f, 0f), Order + 6, 0.7f);
         if (fly != null && fly.Length > 1) sr.gameObject.AddComponent<SpriteAnimator>().frames = fly;
         me = sr.transform;
-        tanker = Ui.Spr("Tanker", root, PropArt.Tanker, new Vector2(2.4f, 0f), Order + 6, 1.15f).transform;
+        var bubba = PropArt.Imagen("bubba", 1.9f);
+        tanker = Ui.Spr("Tanker", root, bubba ? bubba : PropArt.Tanker, new Vector2(2.4f, 0f), Order + 6, bubba ? 1f : 1.15f).transform;
         hose = Ui.Box("Hose", root, Vector2.zero, new Vector2(3.4f, 0.08f), Announcer.Teal, Order + 4).transform;
         hose.gameObject.SetActive(false);
         Hud("FUEL 0/" + level.goal, "POINTS 100");

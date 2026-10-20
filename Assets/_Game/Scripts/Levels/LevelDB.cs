@@ -58,7 +58,7 @@ public class LevelDef
                 case LevelGame.Stack: core = "STACK " + goal + " CRATES"; break;
                 case LevelGame.Landing: core = "LAND " + goal + " TIMES"; break;
                 case LevelGame.Supply: core = "CATCH " + goal + " CRATES"; break;
-                case LevelGame.Bolt: core = "DODGE " + goal + " BOLTS"; break;
+                case LevelGame.Bolt: core = "CROSS " + goal + " GAPS"; break;
                 default: core = "FILL FOR " + goal + " SECONDS"; break;
             }
             return core + TwistLine;
@@ -76,7 +76,7 @@ public class LevelDef
                 case LevelGame.Boss: return "STYLE";
                 case LevelGame.Missile: return "POINTS";
                 case LevelGame.Stack: return "PERFECT";
-                case LevelGame.Bolt: return "CLOSE";
+                case LevelGame.Bolt: return "MAIL";
                 default: return "POINTS";
             }
         }

@@ -359,8 +359,13 @@ public class CutscenePlayer : MonoBehaviour
         if (!File.Exists(path)) return null;
         var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
         if (!tex.LoadImage(File.ReadAllBytes(path))) return null;
-        var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 32f);
+        // Width always spans the 15-unit view. 480px art stays at 32 PPU. Larger Imagine frames use bilinear.
+        if (tex.width >= 900) tex.filterMode = FilterMode.Bilinear;
+        var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), tex.width / 15f);
         artCache[name] = sprite;
         return sprite;
     }
+
+    /// <summary>Scale a story sprite (always 15 units wide) down to a postcard slot.</summary>
+    public static float Fit(Sprite s, float worldW) => worldW / Mathf.Max(0.01f, s.bounds.size.x);
 }
