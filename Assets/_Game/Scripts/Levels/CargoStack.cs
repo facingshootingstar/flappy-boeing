@@ -28,6 +28,8 @@ public class CargoStack : MiniGame
         var deck = PropArt.Paint("parallax/props/deck.png", 0.42f);
         if (!deck) deck = PropArt.Paint("parallax/props/runway.png", 0.42f);
         if (deck) PropArt.TileStrip(stack, deck, -3.6f, 7.2f, Base + 0.22f, Order + 2, "Deck");
+        var cart = PropArt.Paint("parallax/props/cart.png", 0.55f);
+        if (cart) Ui.Spr("Cart", stack, cart, new Vector2(2.3f, Base + 0.48f), Order + 3);
         else
         {
             Ui.Box("DeckEdge", stack, new Vector2(0f, Base - 0.13f), new Vector2(7.2f, 0.12f), Ui.Ink, Order + 1);

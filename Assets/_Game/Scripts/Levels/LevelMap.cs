@@ -330,11 +330,23 @@ public class LevelMap : MonoBehaviour
                 var c = Ui.Spr("FarCloud", mapFar, farCloud, new Vector2(-8f + i * 6f, 2.2f + (i % 2) * 0.4f), Order - 30);
                 c.color = new Color(1f, 1f, 1f, 0.22f);
             }
+        var join = PropArt.Paint("parallax/props/cloud.png", 3.4f);
         for (int w = 1; w < LevelDB.Worlds.Length; w++)
         {
-            // a soft column, not a row of discs, so the painted worlds don't meet on a hard cut
-            Ui.Box("Seam", strip, new Vector2(w * Segment, 0.2f), new Vector2(3.4f, 9.2f), new Color(0.97f, 0.94f, 0.9f, 0.38f), Order - 15);
-            Ui.Box("SeamSoft", strip, new Vector2(w * Segment, 0.6f), new Vector2(5.2f, 8.4f), new Color(0.93f, 0.9f, 0.86f, 0.16f), Order - 16);
+            if (join)
+            {
+                // Hand-painted cloud cluster on the world edge. The old join was a fog rectangle.
+                Ui.Spr("Join", strip, join, new Vector2(w * Segment, 0.55f), Order - 15);
+                var b = Ui.Spr("JoinB", strip, join, new Vector2(w * Segment - 1.1f, 1.7f), Order - 14);
+                b.transform.localScale = new Vector3(0.72f, 0.72f, 1f);
+                var c = Ui.Spr("JoinC", strip, join, new Vector2(w * Segment + 1.15f, -0.85f), Order - 14);
+                c.transform.localScale = new Vector3(0.64f, 0.64f, 1f);
+            }
+            else
+            {
+                Ui.Box("Seam", strip, new Vector2(w * Segment, 0.2f), new Vector2(3.4f, 9.2f), new Color(0.97f, 0.94f, 0.9f, 0.38f), Order - 15);
+                Ui.Box("SeamSoft", strip, new Vector2(w * Segment, 0.6f), new Vector2(5.2f, 8.4f), new Color(0.93f, 0.9f, 0.86f, 0.16f), Order - 16);
+            }
         }
         drift = new Transform[4];
         float span = Segment * LevelDB.Worlds.Length;

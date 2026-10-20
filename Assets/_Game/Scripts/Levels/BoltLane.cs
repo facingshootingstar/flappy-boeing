@@ -105,7 +105,9 @@ public class BoltLane : MiniGame
     void AddPlat(Sprite plank, float x, float w, float top, int island)
     {
         plats.Add(new Plat { x = x, w = w, y = top, island = island });
-        if (island >= 0)
+        var ground = PropArt.Paint("parallax/props/bolt_ground.png", 2.9f);
+        if (ground) PropArt.TileStrip(world, ground, x, w, top + 0.06f, Order + 2, "Ground");
+        else if (island >= 0)
             Ui.Box("Fill", world, new Vector2(x + w * 0.5f, top - 1.45f), new Vector2(w, 2.9f), new Color(0.42f, 0.28f, 0.16f, 1f), Order + 2);
         bool raw = plank == Ui.Pixel;
         float tile = raw ? 1.4f : Mathf.Max(0.4f, plank.bounds.size.x);
@@ -120,7 +122,7 @@ public class BoltLane : MiniGame
                 : new Vector3(step / tile, 1f, 1f);
             sr.color = Color.white;
         }
-        var grass = PropArt.Paint("parallax/props/grass.png", 0.5f);
+        var grass = ground ? null : PropArt.Paint("parallax/props/grass.png", 0.5f);
         if (grass) PropArt.TileStrip(world, grass, x, w, top + 0.08f, Order + 4, "Grass");
     }
 
