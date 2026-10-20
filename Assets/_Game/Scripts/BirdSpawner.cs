@@ -13,6 +13,12 @@ public class BirdSpawner : MonoBehaviour
     float timer;
     readonly List<Transform> columns = new List<Transform>();
 
+    void Start()
+    {
+        Spawn(gap);
+        if (columns.Count > 0) columns[0].position = new Vector3(4.6f, 0f, 0f);
+    }
+
     void Update()
     {
         var gs = GameState.I;
@@ -63,9 +69,9 @@ public class BirdSpawner : MonoBehaviour
         var go = new GameObject("Bird");
         go.transform.SetParent(parent, false);
         go.transform.localPosition = new Vector3(Random.Range(-1.0f, 1.0f), y, 0);
-        float s = Random.Range(0.85f, 1.1f);
+        float s = Random.Range(1.35f, 1.6f);
         go.transform.localScale = new Vector3(s, s, 1);
-        var sr = go.AddComponent<SpriteRenderer>(); sr.sortingOrder = 10;
+        var sr = go.AddComponent<SpriteRenderer>(); sr.sortingOrder = 16;
         var a = go.AddComponent<SpriteAnimator>(); a.frames = cruise; a.fps = Random.Range(5f, 8f); a.phase = Random.Range(0f, 4f);
         var f = go.AddComponent<BirdFlight>();
         f.amp = Random.Range(0.1f, 0.28f); f.freq = Random.Range(1.2f, 2.2f); f.phase = Random.Range(0f, 6.28f); f.drift = Random.Range(-0.2f, 0.2f);
