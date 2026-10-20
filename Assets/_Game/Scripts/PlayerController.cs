@@ -68,6 +68,9 @@ public class PlayerController : MonoBehaviour
         if (fly != null && fly.Length > 0) anim.Play(fly, 12f);
         if (MiniGame.Bot && GameState.I != null && !GameState.I.Started)
         {
+            var ap = GetComponent<AutoPilot>();
+            if (!ap) ap = gameObject.AddComponent<AutoPilot>();
+            if (!ap.player) ap.player = transform;
             GameState.I.Begin();
             rb.gravityScale = gravityScale;
         }

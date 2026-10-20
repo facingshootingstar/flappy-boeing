@@ -8,15 +8,18 @@ public class BirdSpawner : MonoBehaviour
     public float speed = 3.2f;
     public float interval = 1.9f;
     public float gap = 3.0f;
-    public float spawnX = 9f;
+    public float spawnX = 11f;
 
-    float timer;
+    float timer = 0.6f;
+    bool opened;
     readonly List<Transform> columns = new List<Transform>();
 
     void Start()
     {
-        Spawn(gap);
-        if (columns.Count > 0) columns[0].position = new Vector3(4.6f, 0f, 0f);
+        // The scene still serializes 9, and Start used to park that flock at x=4.6.
+        // Birds spread a unit left of the root, and the view ends at 7.5, so 11 keeps the first flock off screen.
+        spawnX = 11f;
+        timer = 0.6f;
     }
 
     void Update()
@@ -31,7 +34,13 @@ public class BirdSpawner : MonoBehaviour
         float curGap = Mathf.Lerp(gap, gap * 0.82f, k);
 
         timer -= Time.deltaTime;
-        if (timer <= 0f) { Spawn(curGap); timer = curInterval; }
+        if (timer <= 0f)
+        {
+            // The opening lane is wide and on the hover line. Later lanes stay the normal gap.
+            if (!opened) { Spawn(Mathf.Max(curGap, 4.6f), 0f); opened = true; }
+            else Spawn(curGap, Random.Range(-2.1f, 2.1f));
+            timer = curInterval;
+        }
 
         for (int i = columns.Count - 1; i >= 0; i--)
         {
@@ -43,12 +52,11 @@ public class BirdSpawner : MonoBehaviour
 
     // A flock crossing the screen. Birds are scattered (random spacing, x spread, gaps in the flock) rather than lined up;
     // the only guarantee is an open lane around the gate, wide enough for any bob/drift.
-    void Spawn(float curGap)
+    void Spawn(float curGap, float centerY)
     {
         var col = new GameObject("Flock").transform;
         col.SetParent(transform, false);
         col.position = new Vector3(spawnX, 0, 0);
-        float centerY = Random.Range(-2.1f, 2.1f);
         const float top = 4.6f, bottom = -4.6f;
         float lane = curGap / 2f + 0.55f;   // keeps bobbing birds out of the corridor
         for (float y = centerY + lane; y < top; y += Random.Range(0.75f, 1.35f))
