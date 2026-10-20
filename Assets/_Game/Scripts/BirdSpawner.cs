@@ -20,6 +20,14 @@ public class BirdSpawner : MonoBehaviour
         // Birds spread a unit left of the root, and the view ends at 7.5, so 11 keeps the first flock off screen.
         spawnX = 11f;
         timer = 0.6f;
+        // Scene cruise is the old pixel sheet. Painted frames replace it when all four exist.
+        var painted = new Sprite[4];
+        for (int i = 0; i < 4; i++)
+        {
+            painted[i] = PropArt.Paint("parallax/props/bird_" + i + ".png", 0.7f);
+            if (!painted[i]) return;
+        }
+        cruise = painted;
     }
 
     void Update()

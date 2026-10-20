@@ -33,7 +33,7 @@ public class ParallaxWorld : MonoBehaviour
     bool onCamera;
     float flashIn = 2.2f, shotIn = 1.4f;
     int fpsFrames;
-    float fpsAcc;
+    float fpsAcc, fpsMark;
 
     public static ParallaxWorld Spawn(int world, Transform parent, bool onCamera)
     {
@@ -154,6 +154,7 @@ public class ParallaxWorld : MonoBehaviour
                 Drifters("parallax/props/puff.png", 3, 1.1f, 5, new Color(1f, 1f, 1f, 0.2f), 0.14f);
                 break;
             case 2:
+                Gulls(3, 2.4f, 6);
                 Rain(16, 6.5f, 0.38f, 0.28f, 5);
                 Rain(20, 13f, 0.72f, 0.5f, onCamera ? 15 : 44);
                 Drifters("parallax/props/leaf.png", 3, 3.4f, onCamera ? 15 : 44, new Color(0.45f, 0.55f, 0.35f, 0.22f), 0.16f);
@@ -161,6 +162,7 @@ public class ParallaxWorld : MonoBehaviour
                 break;
             case 3:
                 OnBand(2, t => Bobber(t, "parallax/props/balloon.png", new Vector2(-2f, 1.6f), 1.1f, 5, 0.18f, 0.35f));
+                OnBand(3, t => Flag(t, new Vector2(2.4f, -0.2f), 6));
                 OnBand(2, t => Smoke(t, new Vector2(3.2f, -0.4f), 5));
                 Lamps(10);
                 Drifters("parallax/props/puff.png", 3, 0.55f, 12, new Color(1f, 0.82f, 0.4f, 0.2f), 0.12f);
@@ -169,7 +171,11 @@ public class ParallaxWorld : MonoBehaviour
                 OnBand(1, t => Beam(t, new Vector2(-3.2f, -0.4f), 3));
                 Fireflies(12);
                 Aurora();
-                shot = Ui.Box("Star", transform, new Vector2(8f, 3f), new Vector2(0.7f, 0.04f), new Color(1f, 0.95f, 0.8f, 0f), 8);
+                var streak = PropArt.Paint("parallax/props/star_shot.png", 0.7f, true);
+                shot = streak
+                    ? Ui.Spr("Star", transform, streak, new Vector2(8f, 3f), 8)
+                    : Ui.Box("Star", transform, new Vector2(8f, 3f), new Vector2(0.7f, 0.04f), new Color(1f, 0.95f, 0.8f, 0f), 8);
+                shot.color = new Color(1f, 0.95f, 0.8f, 0f);
                 break;
         }
     }
@@ -224,10 +230,9 @@ public class ParallaxWorld : MonoBehaviour
 
     void Flag(Transform tile, Vector2 at, int order)
     {
-        var spr = PropArt.Paint("parallax/props/flag.png", 0.42f);
-        var sr = spr
-            ? Ui.Spr("Flag", tile, spr, at, order)
-            : Ui.Box("Flag", tile, at, new Vector2(0.42f, 0.2f), new Color(0.82f, 0.2f, 0.16f), order);
+        var spr = PropArt.Paint("parallax/props/flag.png", 0.55f);
+        if (!spr) return;
+        var sr = Ui.Spr("Flag", tile, spr, at, order);
         var sp = sr.gameObject.AddComponent<Spinner>();
         sp.speed = 0f;
         sp.swingAmp = 10f;
@@ -264,20 +269,20 @@ public class ParallaxWorld : MonoBehaviour
 
     void Gulls(int n, float speed, int order)
     {
-        var up = PropArt.Paint("parallax/props/gull.png", 0.42f);
-        if (!up) return;
-        var down = PropArt.Paint("parallax/props/gull2.png", 0.42f);
+        var frames = new Sprite[4];
+        for (int i = 0; i < 4; i++)
+        {
+            frames[i] = PropArt.Paint("parallax/props/bird_" + i + ".png", 0.42f);
+            if (!frames[i]) return;
+        }
         for (int i = 0; i < n; i++)
         {
             float y = Random.Range(0.4f, 3.1f);
-            var sr = Ui.Spr("Gull", transform, up, new Vector2(Random.Range(-7f, 7f), y), order);
-            if (down)
-            {
-                var anim = sr.gameObject.AddComponent<SpriteAnimator>();
-                anim.frames = new[] { up, down };
-                anim.fps = 7f;
-                anim.phase = Random.value * 2f;
-            }
+            var sr = Ui.Spr("Gull", transform, frames[0], new Vector2(Random.Range(-7f, 7f), y), order);
+            var anim = sr.gameObject.AddComponent<SpriteAnimator>();
+            anim.frames = frames;
+            anim.fps = 8f;
+            anim.phase = Random.value * 4f;
             var m = sr.gameObject.AddComponent<SkyMote>();
             m.speed = speed + i * 0.15f;
             m.bob = 0.14f;
@@ -335,10 +340,13 @@ public class ParallaxWorld : MonoBehaviour
 
     void Fireflies(int n)
     {
+        var fly = PropArt.Paint("parallax/props/firefly.png", 0.32f);
+        float scale = fly ? 1f : 0.22f;
+        var blob = fly ? fly : SoftDisc();
         for (int i = 0; i < n; i++)
         {
-            var sr = Ui.Spr("Fly", transform, Ui.Disc, new Vector2(Random.Range(-7f, 7f), Random.Range(-2f, 2.5f)), 8, 0.04f);
-            sr.color = new Color(0.85f, 1f, 0.55f, 0.45f);
+            var sr = Ui.Spr("Fly", transform, blob, new Vector2(Random.Range(-7f, 7f), Random.Range(-2f, 2.5f)), 8, scale);
+            sr.color = fly ? Color.white : new Color(0.85f, 1f, 0.55f, 0.55f);
             var m = sr.gameObject.AddComponent<SkyMote>();
             m.speed = 0.35f;
             m.bob = 0.35f;
@@ -350,12 +358,36 @@ public class ParallaxWorld : MonoBehaviour
 
     void Aurora()
     {
-        for (int i = 0; i < 8; i++)
+        // Hard boxes read as a UI glitch. A few wide soft discs sit in the sky like a milky way.
+        var blob = SoftDisc();
+        for (int i = 0; i < 5; i++)
         {
-            var c = i % 2 == 0 ? new Color(0.35f, 0.95f, 0.7f, 0.2f) : new Color(0.6f, 0.4f, 0.95f, 0.16f);
-            var sr = Ui.Box("Aurora", transform, new Vector2(-7f + i * 2f, 1.4f), new Vector2(2.4f, 0.45f), c, 1);
+            var c = i % 2 == 0 ? new Color(0.45f, 0.95f, 0.75f, 0.22f) : new Color(0.62f, 0.45f, 0.95f, 0.16f);
+            var sr = Ui.Spr("Aurora", transform, blob, new Vector2(-6f + i * 3.1f, 1.15f + (i % 2) * 0.7f), 1, 1f);
+            sr.color = c;
+            sr.transform.localScale = new Vector3(4.2f, 1.15f, 1f);
             aurora.Add(sr.transform);
         }
+    }
+
+    static Sprite softDisc;
+    static Sprite SoftDisc()
+    {
+        if (softDisc) return softDisc;
+        const int n = 64;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+        var pix = new Color[n * n];
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+            {
+                float u = (x + 0.5f) / n * 2f - 1f, v = (y + 0.5f) / n * 2f - 1f;
+                float a = Mathf.Clamp01(1f - (u * u + v * v));
+                pix[y * n + x] = new Color(1f, 1f, 1f, a * a);
+            }
+        tex.SetPixels(pix);
+        tex.Apply();
+        softDisc = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), n);
+        return softDisc;
     }
 
     void Rain(int count, float speed, float len, float alpha, int order)
@@ -389,6 +421,9 @@ public class ParallaxWorld : MonoBehaviour
         fpsAcc += Time.unscaledDeltaTime;
         if (fpsFrames == 240)
             Debug.Log("[Parallax] fps " + (240f / fpsAcc).ToString("0.0"));
+        else if (fpsFrames == 480)
+            Debug.Log("[Parallax] fps " + (240f / (fpsAcc - fpsMark)).ToString("0.0"));
+        if (fpsFrames == 240) fpsMark = fpsAcc;
         for (int i = 0; i < bands.Count; i++)
         {
             var b = bands[i];
