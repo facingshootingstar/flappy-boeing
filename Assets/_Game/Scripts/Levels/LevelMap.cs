@@ -39,8 +39,9 @@ public class LevelMap : MonoBehaviour
     public static Vector2 NodePos(int index)
     {
         int w = index / LevelDB.PerWorld, j = index % LevelDB.PerWorld;
-        float x = w * Segment + 2.2f + j * 2.75f;
-        float y = 2.35f + 0.16f * Mathf.Sin(index * 1.05f + 0.4f);
+        // Centres stay in [-1, 1.5]. The star arc and the LAND label need the slack below the menu buttons.
+        float x = w * Segment + 1.4f + j * 3.15f;
+        float y = 0.2f + 1.05f * Mathf.Sin(index * 0.9f + 0.4f);
         return new Vector2(x, y);
     }
 
@@ -66,7 +67,7 @@ public class LevelMap : MonoBehaviour
         var fly = LevelRuntime.Fly;
         if (fly != null && fly.Length > 0)
         {
-            var sr = Ui.Spr("You", strip, fly[0], planeFrom + new Vector2(0.3f, 1.05f), Order + 8, 0.55f);
+            var sr = Ui.Spr("You", strip, fly[0], planeFrom + new Vector2(0.55f, 0.35f), Order + 8, 0.55f);
             sr.gameObject.AddComponent<SpriteAnimator>().frames = fly;
             plane = sr.transform;
         }
@@ -103,14 +104,14 @@ public class LevelMap : MonoBehaviour
             }
         }
         var c = LevelDB.WorldColor[w];
-        Ui.Txt(strip, "WORLD " + (w + 1), new Vector2(cx, 3.55f), 0.7f, Announcer.Cream, Order - 10);
-        Ui.Txt(strip, LevelDB.Worlds[w], new Vector2(cx, 3.15f), 1.15f, c, Order - 10, PixelText.Align.Center, PixelText.Effect.Wave);
+        Ui.Txt(strip, "WORLD " + (w + 1), new Vector2(cx, -2.15f), 0.7f, Announcer.Cream, Order - 10);
+        Ui.Txt(strip, LevelDB.Worlds[w], new Vector2(cx, -2.65f), 1.05f, c, Order - 10, PixelText.Align.Center, PixelText.Effect.Wave);
         if (w > 0 && w < LevelDB.GateStars.Length)
         {
             bool gateOpen = LevelFlow.Unlocked(w * LevelDB.PerWorld + 1);
-            var arch = Ui.Spr("Gate", strip, PropArt.Gate, new Vector2(w * Segment + 0.2f, 0.2f), Order - 4, 1.05f);
+            var arch = Ui.Spr("Gate", strip, PropArt.Gate, new Vector2(w * Segment + 0.35f, -2.15f), Order - 4, 1.05f);
             if (!gateOpen) arch.color = new Color(0.45f, 0.45f, 0.52f, 0.95f);
-            Ui.Txt(strip, LevelDB.GateStars[w] + " STARS", new Vector2(w * Segment + 0.2f, -0.9f), 0.65f,
+            Ui.Txt(strip, LevelDB.GateStars[w] + " STARS", new Vector2(w * Segment + 0.35f, -2.9f), 0.65f,
                 gateOpen ? Announcer.Yellow : Announcer.Cream, Order - 3);
         }
         // locked worlds get a haze until their first level opens
@@ -272,11 +273,11 @@ public class LevelMap : MonoBehaviour
                 planeT = Mathf.Min(1f, planeT + Time.unscaledDeltaTime * 0.65f);
                 float e = planeT * planeT * (3f - 2f * planeT);
                 var p = Vector2.Lerp(planeFrom, planeTo, e);
-                p.y += Mathf.Sin(e * Mathf.PI) * 0.85f;
-                plane.localPosition = p + new Vector2(0.3f, 0.9f);
+                p.y += Mathf.Sin(e * Mathf.PI) * 0.4f;
+                plane.localPosition = p + new Vector2(0.55f, 0.35f);
                 if (planeT >= 1f) Arrive();
             }
-            else plane.localPosition = planeTo + new Vector2(0.3f, 1.15f + 0.1f * Mathf.Sin(t * 3f));
+            else plane.localPosition = planeTo + new Vector2(0.55f, 0.35f + 0.08f * Mathf.Sin(t * 3f));
         }
         if (drift != null)
         {
@@ -307,8 +308,8 @@ public class LevelMap : MonoBehaviour
         for (int i = 0; i < 5; i++)
         {
             Vector2 p = i + 1 < LevelDB.Worlds.Length
-                ? new Vector2((i + 1) * Segment + 0.2f, 1.65f)
-                : nodePos[nodePos.Count - 1] + new Vector2(1.7f, 1.25f);
+                ? new Vector2((i + 1) * Segment + 0.35f, -2.05f)
+                : nodePos[nodePos.Count - 1] + new Vector2(1.7f, -1.15f);
             chestPos.Add(p);
             bool open = LevelFlow.ChestOpen(i);
             var sr = Ui.Spr("Chest" + i, strip, PropArt.Chest, p, Order + 6, 0.85f);
@@ -339,7 +340,7 @@ public class LevelMap : MonoBehaviour
         float span = Segment * LevelDB.Worlds.Length;
         for (int i = 0; i < drift.Length; i++)
         {
-            var c = Ui.Box("Shade", strip, new Vector2(i * span / drift.Length, -2.6f), new Vector2(2.4f, 0.28f), new Color(0.1f, 0.12f, 0.16f, 0.14f), Order - 8);
+            var c = Ui.Box("Shade", strip, new Vector2(i * span / drift.Length, -3.35f), new Vector2(2.4f, 0.28f), new Color(0.1f, 0.12f, 0.16f, 0.14f), Order - 8);
             drift[i] = c.transform;
         }
     }
@@ -388,7 +389,7 @@ public class LevelMap : MonoBehaviour
                 int need = LevelDB.GateBlock(i + 1);
                 if (need > 0)
                 {
-                    var pop = Ui.Txt(strip, "NEED " + need + " STARS", nodePos[i] + new Vector2(0f, 1.15f), 0.7f, Announcer.Yellow, Order + 12);
+                    var pop = Ui.Txt(strip, "NEED " + need + " STARS", nodePos[i] + new Vector2(0f, 0.7f), 0.7f, Announcer.Yellow, Order + 12);
                     Destroy(pop.gameObject, 1.1f);
                 }
                 return;
