@@ -292,15 +292,24 @@ public class LevelRuntime : MonoBehaviour
         var pc = FindAnyObjectByType<PlayerController>(FindObjectsInactive.Include);
         if (pc)
         {
-            var poe = PropArt.Imagen("poe", 1.15f);
+            const float PoeH = 1.4f;
+            var fly = PropArt.PoeSet("fly", 4, PoeH);
+            var poe = fly != null ? fly[0] : PropArt.Imagen("poe", PoeH);
             if (poe)
             {
-                pc.fly = new[] { poe };
-                pc.climb = new[] { PropArt.Imagen("poe_climb", 1.15f) ?? poe };
-                pc.dive = new[] { PropArt.Imagen("poe_dive", 1.15f) ?? poe };
-                pc.hit = poe;
+                pc.fly = fly ?? new[] { poe };
+                pc.climb = PropArt.PoeSet("climb", 1, PoeH) ?? pc.fly;
+                pc.dive = PropArt.PoeSet("dive", 1, PoeH) ?? pc.fly;
+                var hit = PropArt.PoeSet("hit", 1, PoeH);
+                pc.hit = hit != null ? hit[0] : poe;
                 var body = pc.GetComponent<SpriteRenderer>();
-                if (body) body.sprite = poe;
+                if (body)
+                {
+                    body.sprite = poe;
+                    body.sortingOrder = 16;
+                }
+                var anim = pc.GetComponent<SpriteAnimator>();
+                if (anim) anim.Play(pc.fly, 12f);
             }
             Fly = pc.fly;
         }
@@ -344,16 +353,11 @@ public class LevelRuntime : MonoBehaviour
             CutscenePlayer.Play("intro", () => FilmFilter.IrisOpen(0.55f));
     }
 
-    /// <summary>Imagine sky over the scene plate. Order 5: above parallax, under birds and Poe at 10.</summary>
+    /// <summary>Painted parallax for this world, stuck to the camera so the play plane is not clipped.</summary>
     void PaintSky(int world)
     {
-        string[] names = { "sky_dawn", "sky_sea", "sky_storm", "sky_sundown", "sky_star" };
-        var sky = PropArt.Imagen(names[Mathf.Clamp(world, 0, names.Length - 1)], 15f, true);
         var cam = Camera.main;
-        if (!sky || !cam) return;
-        // Child at local zero sits on the camera and gets clipped. Push it onto the play plane (camera z is behind 0).
-        var plate = Ui.Spr("ImagineSky", cam.transform, sky, Vector2.zero, 5);
-        plate.transform.localPosition = new Vector3(0f, 0f, -cam.transform.position.z);
+        if (cam) ParallaxWorld.Spawn(world, cam.transform, true);
     }
 
     void HideShell()

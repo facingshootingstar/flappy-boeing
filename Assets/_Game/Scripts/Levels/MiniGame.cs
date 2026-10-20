@@ -9,8 +9,10 @@ public abstract class MiniGame : MonoBehaviour
 {
     /// <summary>Debug: let the game play itself (tests / screenshots).</summary>
     public static bool Bot;
+    /// <summary>0..1 through the level, so the world light can shift. Flappy uses the pipe score instead.</summary>
+    public static float Progress01;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { Bot = false; }
+    static void ResetStatics() { Bot = false; Progress01 = 0f; }
 
     public const float W = 7.5f, H = 4.22f;
     protected const int Order = 30;
@@ -29,9 +31,7 @@ public abstract class MiniGame : MonoBehaviour
         hudLeft = Ui.Txt(root, "", new Vector2(-7.1f, 3.8f), 1.1f, Color.white, Order + 50, PixelText.Align.Left);
         hudRight = Ui.Txt(root, "", new Vector2(7.1f, 3.8f), 1.1f, Announcer.Yellow, Order + 50, PixelText.Align.Right);
         hint = Ui.Txt(root, HintText, new Vector2(0f, -3.75f), 0.9f, Announcer.Cream, Order + 50);
-        string[] skies = { "sky_dawn", "sky_sea", "sky_storm", "sky_sundown", "sky_star" };
-        var sky = PropArt.Imagen(skies[Mathf.Clamp(level.world, 0, skies.Length - 1)], 15f, true);
-        if (sky) Ui.Spr("WorldSky", root, sky, Vector2.zero, 20);
+        ParallaxWorld.Spawn(level.world, root, false);
         Build();
         if (level.twist == LevelTwist.Night)
             Ui.Box("Night", root, Vector2.zero, new Vector2(18f, 10f), new Color(0.04f, 0.05f, 0.12f, 0.38f), Order + 12);
@@ -89,6 +89,7 @@ public abstract class MiniGame : MonoBehaviour
         if (!running || over) return;
         float dt = Time.deltaTime;
         elapsed += dt;
+        if (level.goal > 0) Progress01 = Mathf.Clamp01(elapsed / level.goal);
         Tick(dt);
     }
 
