@@ -154,15 +154,43 @@ def fade_edges(im, frac=0.07):
 
 
 def seam_opaque(im, frac=0.08):
+    """Make pixel 0 equal the right edge. The old blend copied the start of the right band, so the join was a bright line."""
     rgb = np.array(im.convert("RGB"))
     w = rgb.shape[1]
     band = max(8, int(w * frac))
     out = rgb.copy()
-    t = np.linspace(0, 1, band, dtype=np.float32)[:, None]
-    left = rgb[:, :band].astype(np.float32)
-    right = rgb[:, w - band:].astype(np.float32)
-    out[:, :band] = (left * t + right * (1 - t)).astype(np.uint8)
+    t = np.linspace(0.0, 1.0, band, dtype=np.float32)[None, :, None]
+    left = out[:, :band].astype(np.float32)
+    src = out[:, w - band:][:, ::-1].astype(np.float32)
+    out[:, :band] = np.clip(src * (1.0 - t) + left * t, 0, 255).astype(np.uint8)
     return Image.fromarray(out).convert("RGBA")
+
+
+def bleed_rgb(im, passes=24):
+    """Transparent pixels still hold the plate color. Bilinear sampling paints that as a light edge."""
+    a = np.array(im)
+    rgb = a[..., :3].copy()
+    solid = a[..., 3] > 20
+    h, w = solid.shape
+    for _ in range(passes):
+        src_rgb = rgb.copy()
+        src_solid = solid.copy()
+        for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            rolled_s = np.roll(np.roll(src_solid, dy, 0), dx, 1)
+            rolled_c = np.roll(np.roll(src_rgb, dy, 0), dx, 1)
+            if dy == 1:
+                rolled_s[0, :] = False
+            elif dy == -1:
+                rolled_s[-1, :] = False
+            if dx == 1:
+                rolled_s[:, 0] = False
+            elif dx == -1:
+                rolled_s[:, -1] = False
+            take = ~solid & rolled_s
+            rgb[take] = rolled_c[take]
+            solid[take] = True
+    a[..., :3] = rgb
+    return Image.fromarray(a)
 
 
 def save(im, rel):
@@ -433,6 +461,10 @@ def main():
             im, field, _dist = key_backdrop(im)
         if seam:
             im = seam_opaque(im)
+            rgb = np.array(im.convert("RGB"))
+            err = int(np.max(np.abs(rgb[:, 0].astype(np.int16) - rgb[:, -1].astype(np.int16))))
+            if err > 0:
+                raise SystemExit("seam mismatch " + rel + " " + str(err))
         if fade:
             im = fade_edges(im)
         if do_key:
@@ -442,7 +474,7 @@ def main():
                 p = arr[y0:y0 + 4, x0:x0 + 4]
                 p[..., 3] = np.where(p[..., 3] < 32, 0, p[..., 3])
                 arr[y0:y0 + 4, x0:x0 + 4] = p
-            im = Image.fromarray(arr)
+            im = bleed_rgb(Image.fromarray(arr))
         path = save(im, "parallax/" + rel + ".png")
         zero = float((np.array(im)[..., 3] == 0).mean())
         print("layer", rel, im.size, "clear", round(zero, 3))

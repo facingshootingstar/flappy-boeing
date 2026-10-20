@@ -82,7 +82,9 @@ public class ParallaxWorld : MonoBehaviour
     void MakeBand(Sprite spr, float speed, int order, float alpha, bool fallback, bool overlap)
     {
         float width = spr.bounds.size.x;
-        float span = fallback ? 18f : (overlap ? width * 0.86f : width);
+        // Opaque tiles used to meet on exactly one texel, so bilinear showed the camera clear as a bright line.
+        float pad = 3f / Mathf.Max(1f, spr.pixelsPerUnit);
+        float span = fallback ? 18f : (overlap ? width * 0.82f : Mathf.Max(0.5f, width - pad));
         int n = Mathf.Max(2, Mathf.CeilToInt(20f / Mathf.Max(0.5f, span)) + 1);
         var root = new GameObject("band").transform;
         root.SetParent(transform, false);
