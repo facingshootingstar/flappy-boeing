@@ -213,7 +213,11 @@ public class LevelRuntime : MonoBehaviour
 
     public static void Ensure()
     {
-        if (FindAnyObjectByType<LevelRuntime>()) return;
+        // sceneLoaded can still see the LevelRuntime that the load is about to destroy.
+        var scene = SceneManager.GetActiveScene();
+        var found = FindObjectsByType<LevelRuntime>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < found.Length; i++)
+            if (found[i] && found[i].gameObject.scene == scene) return;
         new GameObject("Levels").AddComponent<LevelRuntime>();
     }
 

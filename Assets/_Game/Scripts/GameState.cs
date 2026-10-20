@@ -55,6 +55,8 @@ public class GameState : MonoBehaviour
 
     void Start()
     {
+        // Backup for a sceneLoaded that skipped Ensure. Awake is too early: it hides roots before they start.
+        LevelRuntime.Ensure();
         if (!FromCheckpoint && Mode != RunMode.BossRush) AudioManager.Music("music_flappy", 0.5f);
     }
 
