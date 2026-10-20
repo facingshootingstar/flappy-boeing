@@ -35,6 +35,16 @@ LAYERS = {
     # props are one sprite, not a scrolling band: no edge fade (that punches the tile)
     "props/grass": ("30.jpg", None, True, False, False),
     "props/pit": ("29.jpg", None, True, False, False),
+    "sundown/sky": ("32.jpg", None, False, False, True),
+    "sundown/far": ("41.jpg", None, True, True, False),
+    "sundown/mid": ("33.jpg", None, True, True, False),
+    "sundown/near": ("31.jpg", None, True, True, False),
+    "sundown/front": ("39.jpg", None, True, True, False),
+    "star/sky": ("37.jpg", None, False, False, True),
+    "star/far": ("35.jpg", None, True, True, False),
+    "star/mid": ("36.jpg", None, True, True, False),
+    "star/near": ("38.jpg", None, True, True, False),
+    "star/front": ("40.jpg", None, True, True, False),
 }
 
 
@@ -443,7 +453,7 @@ def main():
                 # grass blades and pit rock reach the top of the plate
                 need, floor = 0.05, 0.06
             elif rel.endswith("front"):
-                need, floor = 0.45, 0.02
+                need, floor = 0.45, 0.008
             elif rel.endswith("near"):
                 need, floor = 0.55, 0.12
             elif rel.endswith("mid"):
