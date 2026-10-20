@@ -72,8 +72,10 @@ public class BoltLane : MiniGame
             x += w;
             if (i < islands - 1)
             {
-                var pit = new Color(0.05f, 0.04f, 0.07f, 0.94f);
-                Ui.Box("Pit", world, new Vector2(x + gapW * 0.5f, Ground - 1.7f), new Vector2(gapW + 0.15f, 3.5f), pit, Order + 1);
+                var pitSpr = PropArt.Paint("parallax/props/pit.png", 3.3f);
+                if (pitSpr) PropArt.TileStrip(world, pitSpr, x, gapW + 0.15f, Ground + 0.2f, Order + 1, "Pit");
+                else Ui.Box("Pit", world, new Vector2(x + gapW * 0.5f, Ground - 1.7f), new Vector2(gapW + 0.15f, 3.5f), new Color(0.05f, 0.04f, 0.07f, 0.94f), Order + 1);
+                Ui.Box("Mist", world, new Vector2(x + gapW * 0.5f, Ground - 2.9f), new Vector2(gapW, 0.5f), new Color(0.85f, 0.82f, 0.75f, 0.35f), Order + 2);
                 x += gapW;
             }
         }
@@ -118,6 +120,8 @@ public class BoltLane : MiniGame
                 : new Vector3(step / tile, 1f, 1f);
             sr.color = Color.white;
         }
+        var grass = PropArt.Paint("parallax/props/grass.png", 0.5f);
+        if (grass) PropArt.TileStrip(world, grass, x, w, top + 0.08f, Order + 4, "Grass");
     }
 
     protected override void Tick(float dt)

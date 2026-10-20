@@ -19,7 +19,7 @@ public class SupplyDrop : MiniGame
         Ui.Box("Hull", bay, new Vector2(0f, -0.28f), new Vector2(2.1f, 0.4f), new Color32(70, 78, 92, 255), Order + 3);
         Ui.Box("Deck", bay, Vector2.zero, new Vector2(1.8f, 0.28f), new Color32(232, 190, 96, 255), Order + 4);
         var fly = LevelRuntime.Fly;
-        var sr = Ui.Spr("Plane", bay, fly != null && fly.Length > 0 ? fly[0] : Ui.Disc, new Vector2(0f, 0.38f), Order + 5, 0.45f);
+        var sr = Ui.Spr("Plane", bay, fly != null && fly.Length > 0 ? fly[0] : Ui.Disc, new Vector2(0f, 0.38f), Order + 5, 0.62f);
         if (fly != null && fly.Length > 1) sr.gameObject.AddComponent<SpriteAnimator>().frames = fly;
         Hud("CRATES 0/" + level.goal, "POINTS 0");
     }

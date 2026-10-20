@@ -23,8 +23,13 @@ public class PerfectLanding : MiniGame
         if (fly != null && fly.Length > 1) sr.gameObject.AddComponent<SpriteAnimator>().frames = fly;
         plane = sr.transform;
 
-        Ui.Box("Grass", root, new Vector2(0f, Ground - 0.55f), new Vector2(16f, 1.1f), new Color32(96, 150, 78, 255), Order);
-        Ui.Box("GrassEdge", root, new Vector2(0f, Ground - 0.02f), new Vector2(16f, 0.06f), Ui.Ink, Order + 1);
+        var grass = PropArt.Paint("parallax/props/grass.png", 1.15f);
+        if (grass) PropArt.TileStrip(root, grass, -8f, 16f, Ground + 0.05f, Order, "Grass");
+        else
+        {
+            Ui.Box("Grass", root, new Vector2(0f, Ground - 0.55f), new Vector2(16f, 1.1f), new Color32(96, 150, 78, 255), Order);
+            Ui.Box("GrassEdge", root, new Vector2(0f, Ground - 0.02f), new Vector2(16f, 0.06f), Ui.Ink, Order + 1);
+        }
         runway = Ui.Root("Runway", root);
         target = Ui.Root("Target", root);
         Ui.Box("Pole", target, new Vector2(0f, 0.35f), new Vector2(0.06f, 0.7f), Ui.Ink, Order + 3);
@@ -41,9 +46,14 @@ public class PerfectLanding : MiniGame
         float len = Mathf.Lerp(5.5f, 3.4f, level.hard);
         rwB = Random.Range(5.2f, 6.6f);
         rwA = rwB - len;
-        Ui.Box("Strip", runway, new Vector2((rwA + rwB) / 2f, Ground - 0.06f), new Vector2(len, 0.16f), new Color32(78, 76, 84, 255), Order + 2);
-        for (float x = rwA + 0.3f; x < rwB - 0.2f; x += 0.6f)
-            Ui.Box("Dash", runway, new Vector2(x, Ground - 0.05f), new Vector2(0.3f, 0.04f), Color.white, Order + 3);
+        var paving = PropArt.Paint("parallax/props/runway.png", 0.55f);
+        if (paving) PropArt.TileStrip(runway, paving, rwA, len, Ground + 0.12f, Order + 2, "Strip");
+        else
+        {
+            Ui.Box("Strip", runway, new Vector2((rwA + rwB) / 2f, Ground - 0.06f), new Vector2(len, 0.16f), new Color32(78, 76, 84, 255), Order + 2);
+            for (float x = rwA + 0.3f; x < rwB - 0.2f; x += 0.6f)
+                Ui.Box("Dash", runway, new Vector2(x, Ground - 0.05f), new Vector2(0.3f, 0.04f), Color.white, Order + 3);
+        }
         targetX = Random.Range(rwA + len * 0.3f, rwA + len * 0.6f);
         target.localPosition = new Vector3(targetX, Ground, 0f);
 

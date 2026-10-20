@@ -25,8 +25,14 @@ public class CargoStack : MiniGame
         stack = Ui.Root("Stack", root);
         // carrier deck
         Ui.Box("Hull", stack, new Vector2(0f, Base - 0.7f), new Vector2(7f, 1.1f), new Color32(70, 78, 92, 255), Order);
-        Ui.Box("DeckEdge", stack, new Vector2(0f, Base - 0.13f), new Vector2(7.2f, 0.12f), Ui.Ink, Order + 1);
-        Ui.Box("Deck", stack, new Vector2(0f, Base - 0.06f), new Vector2(MaxW + 0.4f, 0.12f), new Color32(232, 190, 96, 255), Order + 2);
+        var deck = PropArt.Paint("parallax/props/deck.png", 0.42f);
+        if (!deck) deck = PropArt.Paint("parallax/props/runway.png", 0.42f);
+        if (deck) PropArt.TileStrip(stack, deck, -3.6f, 7.2f, Base + 0.22f, Order + 2, "Deck");
+        else
+        {
+            Ui.Box("DeckEdge", stack, new Vector2(0f, Base - 0.13f), new Vector2(7.2f, 0.12f), Ui.Ink, Order + 1);
+            Ui.Box("Deck", stack, new Vector2(0f, Base - 0.06f), new Vector2(MaxW + 0.4f, 0.12f), new Color32(232, 190, 96, 255), Order + 2);
+        }
         for (int i = -3; i <= 3; i++)
             Ui.Box("Port", stack, new Vector2(i * 0.95f, Base - 0.65f), new Vector2(0.26f, 0.26f), new Color32(255, 230, 150, 255), Order + 1);
         topX = 0f; topW = MaxW; curW = MaxW;

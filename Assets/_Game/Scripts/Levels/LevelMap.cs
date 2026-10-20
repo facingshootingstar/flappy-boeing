@@ -10,7 +10,8 @@ public class LevelMap : MonoBehaviour
     public const float Segment = 15f;      // one world = one 480px sky
     const int Order = 200;
 
-    Transform strip, card, top;
+    Transform strip, card, top, mapFar;
+    Transform[] drift;
     readonly List<Vector2> nodePos = new List<Vector2>();
     readonly List<Transform> nodes = new List<Transform>();
     float scroll, target, minScroll, maxScroll;
@@ -39,7 +40,7 @@ public class LevelMap : MonoBehaviour
     {
         int w = index / LevelDB.PerWorld, j = index % LevelDB.PerWorld;
         float x = w * Segment + 2.2f + j * 2.75f;
-        float y = 1.25f * Mathf.Sin(index * 1.3f + 0.6f) - 0.55f;
+        float y = 2.35f + 0.16f * Mathf.Sin(index * 1.05f + 0.4f);
         return new Vector2(x, y);
     }
 
@@ -48,6 +49,7 @@ public class LevelMap : MonoBehaviour
         strip = Ui.Root("MapStrip", transform);
         for (int w = 0; w < LevelDB.Worlds.Length; w++) BuildWorld(w);
         for (int i = 0; i < LevelDB.Count; i++) nodePos.Add(NodePos(i));
+        BuildDepth();
         BuildTrail();
         for (int i = 0; i < LevelDB.Count; i++) nodes.Add(BuildNode(LevelDB.All[i], nodePos[i]));
         BuildTop();
@@ -101,8 +103,8 @@ public class LevelMap : MonoBehaviour
             }
         }
         var c = LevelDB.WorldColor[w];
-        Ui.Txt(strip, "WORLD " + (w + 1), new Vector2(cx, 2.85f), 1f, Announcer.Cream, Order - 10);
-        Ui.Txt(strip, LevelDB.Worlds[w], new Vector2(cx, 2.35f), 1.6f, c, Order - 10, PixelText.Align.Center, PixelText.Effect.Wave);
+        Ui.Txt(strip, "WORLD " + (w + 1), new Vector2(cx, 3.55f), 0.7f, Announcer.Cream, Order - 10);
+        Ui.Txt(strip, LevelDB.Worlds[w], new Vector2(cx, 3.15f), 1.15f, c, Order - 10, PixelText.Align.Center, PixelText.Effect.Wave);
         if (w > 0 && w < LevelDB.GateStars.Length)
         {
             bool gateOpen = LevelFlow.Unlocked(w * LevelDB.PerWorld + 1);
@@ -130,7 +132,8 @@ public class LevelMap : MonoBehaviour
             {
                 float t = k / (float)dots;
                 var p = Vector2.Lerp(a, b, t) + new Vector2(0f, Mathf.Sin(t * Mathf.PI) * 0.35f);
-                var d = Ui.Spr("Dot", strip, Ui.Disc, p, Order - 5, 0.2f);
+                var d = Ui.Spr("Dash", strip, Ui.Disc, p, Order - 5, 1f);
+                d.transform.localScale = new Vector3(0.42f, 0.08f, 1f);
                 d.color = open ? Announcer.Cream : new Color(0.45f, 0.42f, 0.42f, 0.9f);
             }
         }
@@ -143,6 +146,8 @@ public class LevelMap : MonoBehaviour
         var n = Ui.Root("Node" + lv.id, strip, pos);
         float size = lv.IsBoss ? 1.35f : 1f;
         var col = LevelDB.WorldColor[lv.world];
+        var ring = Ui.Spr("Ring", n, Ui.Disc, Vector2.zero, Order, size * 1.22f);
+        ring.color = Ui.Ink;
         var shadow = Ui.Spr("Shadow", n, Ui.Disc, new Vector2(0.06f, -0.1f), Order, size);
         shadow.color = new Color(0f, 0f, 0f, 0.35f);
         var disc = Ui.Spr("Disc", n, Ui.Disc, Vector2.zero, Order + 1, size);
@@ -273,6 +278,17 @@ public class LevelMap : MonoBehaviour
             }
             else plane.localPosition = planeTo + new Vector2(0.3f, 1.15f + 0.1f * Mathf.Sin(t * 3f));
         }
+        if (drift != null)
+        {
+            float span = Segment * LevelDB.Worlds.Length;
+            for (int i = 0; i < drift.Length; i++)
+            {
+                if (!drift[i]) continue;
+                var p = drift[i].localPosition;
+                p.x = Mathf.Repeat(t * 0.4f + i * span / drift.Length, span);
+                drift[i].localPosition = p;
+            }
+        }
         for (int c = 0; c < chests.Count; c++)
             if (LevelFlow.ChestReady(c))
                 chests[c].localScale = Vector3.one * (0.95f + 0.08f * Mathf.Sin(t * 5f + c));
@@ -303,7 +319,36 @@ public class LevelMap : MonoBehaviour
         }
     }
 
-    void Apply() { if (strip) strip.localPosition = new Vector3(-scroll, 0f, 0f); }
+    void BuildDepth()
+    {
+        mapFar = Ui.Root("MapFar", transform);
+        var farCloud = PropArt.Paint("parallax/props/puff.png", 0.7f);
+        if (farCloud)
+            for (int i = 0; i < 5; i++)
+            {
+                var c = Ui.Spr("FarCloud", mapFar, farCloud, new Vector2(-8f + i * 6f, 2.2f + (i % 2) * 0.4f), Order - 30);
+                c.color = new Color(1f, 1f, 1f, 0.22f);
+            }
+        for (int w = 1; w < LevelDB.Worlds.Length; w++)
+        {
+            // a soft column, not a row of discs, so the painted worlds don't meet on a hard cut
+            Ui.Box("Seam", strip, new Vector2(w * Segment, 0.2f), new Vector2(3.4f, 9.2f), new Color(0.97f, 0.94f, 0.9f, 0.38f), Order - 15);
+            Ui.Box("SeamSoft", strip, new Vector2(w * Segment, 0.6f), new Vector2(5.2f, 8.4f), new Color(0.93f, 0.9f, 0.86f, 0.16f), Order - 16);
+        }
+        drift = new Transform[4];
+        float span = Segment * LevelDB.Worlds.Length;
+        for (int i = 0; i < drift.Length; i++)
+        {
+            var c = Ui.Box("Shade", strip, new Vector2(i * span / drift.Length, -2.6f), new Vector2(2.4f, 0.28f), new Color(0.1f, 0.12f, 0.16f, 0.14f), Order - 8);
+            drift[i] = c.transform;
+        }
+    }
+
+    void Apply()
+    {
+        if (strip) strip.localPosition = new Vector3(-scroll, 0f, 0f);
+        if (mapFar) mapFar.localPosition = new Vector3(-scroll * 0.38f, 0f, 0f);
+    }
 
     void Select(int id)
     {
