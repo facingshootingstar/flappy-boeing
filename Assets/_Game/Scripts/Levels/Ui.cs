@@ -123,11 +123,13 @@ public static class Ui
 public static class UiInput
 {
     public static Vector2? InjectedClick;
+    /// <summary>Tests type into text fields through this; read once by <see cref="Typed"/>.</summary>
+    public static string InjectedText;
     static int injectedFrame = -1;
     static Vector2 injectedAt;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { InjectedClick = null; injectedFrame = -1; }
+    static void ResetStatics() { InjectedClick = null; InjectedText = null; injectedFrame = -1; }
 
     static void PumpInjected()
     {
@@ -216,6 +218,30 @@ public static class UiInput
     public static bool Back() => K(Key.Escape, Key.Backspace);
     public static bool RetryKey() => K(Key.R);
     public static bool NextKey() => K(Key.N);
+    public static bool Escape() => K(Key.Escape);
+    public static bool Erase() => K(Key.Backspace);
+    public static bool Enter() => K(Key.Enter, Key.NumpadEnter);
+    public static bool Tab() => K(Key.Tab);
+
+    static readonly System.Text.StringBuilder typed = new System.Text.StringBuilder();
+    static Keyboard hooked;
+    static void OnText(char c) => typed.Append(c);
+
+    /// <summary>Characters typed since the last call (control characters included; callers filter).</summary>
+    public static string Typed()
+    {
+        var k = Keyboard.current;
+        if (k != hooked)
+        {
+            if (hooked != null) hooked.onTextInput -= OnText;
+            hooked = k;
+            if (k != null) k.onTextInput += OnText;
+            typed.Clear();
+        }
+        string s = typed.ToString() + TakeInjectedText();
+        typed.Clear();
+        return s;
+    }
 #else
     public static bool LeftDown() => Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
     public static bool RightDown() => Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
@@ -225,5 +251,17 @@ public static class UiInput
     public static bool Back() => Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace);
     public static bool RetryKey() => Input.GetKeyDown(KeyCode.R);
     public static bool NextKey() => Input.GetKeyDown(KeyCode.N);
+    public static bool Escape() => Input.GetKeyDown(KeyCode.Escape);
+    public static bool Erase() => Input.GetKeyDown(KeyCode.Backspace);
+    public static bool Enter() => Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+    public static bool Tab() => Input.GetKeyDown(KeyCode.Tab);
+    public static string Typed() => Input.inputString + TakeInjectedText();
 #endif
+
+    static string TakeInjectedText()
+    {
+        string s = InjectedText ?? "";
+        InjectedText = null;
+        return s;
+    }
 }
