@@ -63,9 +63,16 @@ public class AutoPilot : MonoBehaviour
         foreach (var g in FindObjectsByType<ScoreGate>())
         {
             float dx = g.transform.position.x - player.position.x;
-            if (dx > -2.2f && dx < bestX) { bestX = dx; target = g.transform.position.y; }
+            // Let go of a flock once its gate is past the nose, so the next lane is the target before its birds arrive.
+            if (dx > -0.8f && dx < bestX) { bestX = dx; target = g.transform.position.y; }
         }
-        if (!gs.Started || player.position.y < target - 0.55f) TapInput.InjectedFrame = Time.frameCount;
+        var body = player.GetComponent<Rigidbody2D>();
+        float vy = body ? body.linearVelocity.y : 0f;
+        float y = player.position.y;
+        // One flap per dip. Holding the button used to rocket through the lane into the birds.
+        bool hold = y < target - 0.3f && vy < 0.8f;
+        bool catchUp = y < target - 1.15f && vy < 5.5f;
+        if (!gs.Started || hold || catchUp) TapInput.InjectedFrame = Time.frameCount;
     }
 
     // ---------------------------------------------------------------- combat

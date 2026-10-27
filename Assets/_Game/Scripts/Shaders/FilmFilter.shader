@@ -42,28 +42,13 @@ Shader "Hidden/FilmFilter"
                 // per-virtual-pixel grain
                 c.rgb += (hash(px + frame * 17.13) - 0.5) * _Grain;
 
-                // vertical scratches that live for a few frames
-                float slot = fmod(floor(_T * 5.0), 211.0);
-                for (int k = 0; k < 3; k++)
-                {
-                    if (hash(float2(slot, k * 7.7)) < _Scratch)
-                    {
-                        float sx = floor(hash(float2(slot, k * 3.3 + 1.0)) * 480.0);
-                        float y0 = hash(float2(slot, k + 11.0));
-                        float len = 0.25 + 0.6 * hash(float2(slot, k + 23.0));
-                        if (abs(px.x - sx) < 0.5 && abs(uv.y - y0) < len * 0.5)
-                        {
-                            float light = step(0.5, hash(float2(slot, k + 5.0)));
-                            c.rgb = lerp(c.rgb, light > 0.5 ? float3(0.98, 0.92, 0.80) : _Ink.rgb, 0.45);
-                        }
-                    }
-                }
-
-                // dust specks: 2x2 virtual pixel blobs that pop for one frame
-                float2 cell = floor(px / 2.0);
+                // Scratches were 1 virtual pixel wide and read as a seam. Dust was a hard 2x2 square.
+                // A rare soft disc instead, faint enough that it does not look like a dead pixel.
+                float2 cell = floor(px / 7.0);
+                float2 f = frac(px / 7.0) - 0.5;
                 float d = hash(cell + frame * 5.71);
-                if (d > 1.0 - _Dust) c.rgb = lerp(c.rgb, _Ink.rgb, 0.7);
-                else if (d < _Dust * 0.5) c.rgb = lerp(c.rgb, float3(1.0, 0.96, 0.88), 0.5);
+                float blob = smoothstep(0.42, 0.05, length(f));
+                if (d > 1.0 - _Dust * 3.0) c.rgb = lerp(c.rgb, _Ink.rgb, blob * 0.22);
 
                 // vignette
                 float2 v = (uv - 0.5) * float2(1.0, 0.75);

@@ -22,6 +22,9 @@ public class HudController : MonoBehaviour
     readonly bool[] full = new bool[PlayerWeapons.MaxCards];
     readonly float[] flipT = new float[PlayerWeapons.MaxCards];
     int lastHp = -1;
+    Transform bigScore;
+    PixelText[] bigParts;
+    float punch;
 
     Transform screen;
     PixelText prompt;
@@ -36,10 +39,36 @@ public class HudController : MonoBehaviour
     {
         score.Show(GameState.I ? GameState.I.Score : 0);
         tapPrompt.SetActive(true);
+        BuildBigScore();
         BuildCombatHud();
+        BuildModeHint();
     }
 
-    void OnScore(int s) { score.Show(s); }
+    void BuildBigScore()
+    {
+        if (GameKit.I == null || GameKit.I.font == null || GameKit.I.font.Length == 0) return;
+        bigScore = new GameObject("BigScore").transform;
+        bigScore.SetParent(transform, false);
+        bigScore.localPosition = new Vector3(0f, 3.38f, 0f);
+        Vector2[] off =
+        {
+            new Vector2(-0.055f, 0f), new Vector2(0.055f, 0f), new Vector2(0f, -0.05f), new Vector2(0f, 0.05f),
+            new Vector2(-0.04f, -0.035f), new Vector2(0.04f, -0.035f), new Vector2(-0.04f, 0.035f), new Vector2(0.04f, 0.035f),
+            Vector2.zero
+        };
+        bigParts = new PixelText[off.Length];
+        int n = GameState.I ? GameState.I.Score : 0;
+        for (int i = 0; i < off.Length; i++)
+            bigParts[i] = Txt(bigScore, n.ToString(), off[i], 2.45f, i < off.Length - 1 ? Ink : Color.white, Order + (i < off.Length - 1 ? 0 : 1));
+    }
+
+    void OnScore(int s)
+    {
+        punch = 1f;
+        if (bigParts == null) { score.Show(s); return; }
+        string t = s.ToString();
+        for (int i = 0; i < bigParts.Length; i++) { bigParts[i].Text = t; bigParts[i].Rebuild(); }
+    }
 
     // ---------------------------------------------------------------- building blocks
     static Sprite Pixel
@@ -99,6 +128,23 @@ public class HudController : MonoBehaviour
     }
 
     // ---------------------------------------------------------------- combat HUD
+    Transform modeRoot;
+
+    /// <summary>Temporary menu until the Hangar exists: mode keys + coin balance.</summary>
+    void BuildModeHint()
+    {
+        if (LevelFlow.Current != null) return;
+        modeRoot = new GameObject("ModeHint").transform;
+        modeRoot.SetParent(transform, false);
+        string[] names = { "1 CLASSIC", "2 FLAPPY", "3 BOSS RUSH" };
+        for (int i = 0; i < names.Length; i++)
+        {
+            bool on = (int)GameState.Mode == i;
+            Txt(modeRoot, names[i], new Vector2(-4f + i * 4f, -3.6f), 1f, on ? Announcer.Yellow : Color.white, Order + 1);
+        }
+        Txt(modeRoot, "COINS " + SaveSystem.Data.coins, new Vector2(6.2f, 3.7f), 1f, Announcer.Yellow, Order + 1, PixelText.Align.Right);
+    }
+
     void BuildCombatHud()
     {
         combatRoot = new GameObject("CombatHud").transform;
@@ -158,8 +204,17 @@ public class HudController : MonoBehaviour
         var gs = GameState.I;
         if (gs == null) return;
         if (gs.Started && tapPrompt.activeSelf) tapPrompt.SetActive(false);
+        if (modeRoot && modeRoot.gameObject.activeSelf == (gs.Started || gs.Combat)) modeRoot.gameObject.SetActive(!gs.Started && !gs.Combat);
         bool showScore = !gs.Combat && mode == Screen.None;
-        if (score.gameObject.activeSelf != showScore) score.gameObject.SetActive(showScore);
+        if (bigScore)
+        {
+            if (score.gameObject.activeSelf) score.gameObject.SetActive(false);
+            if (bigScore.gameObject.activeSelf != showScore) bigScore.gameObject.SetActive(showScore);
+            if (punch > 0f) punch = Mathf.Max(0f, punch - Time.unscaledDeltaTime / 0.22f);
+            float k = 1f + Mathf.Sin(punch * Mathf.PI) * 0.34f;
+            bigScore.localScale = new Vector3(k, k, 1f);
+        }
+        else if (score.gameObject.activeSelf != showScore) score.gameObject.SetActive(showScore);
         bool combat = gs.Combat && gs.Alive;
         if (combatRoot.gameObject.activeSelf != combat) combatRoot.gameObject.SetActive(combat);
         if (combat) UpdateCombatHud();
@@ -178,11 +233,12 @@ public class HudController : MonoBehaviour
     // ---------------------------------------------------------------- end screens
     void OnDied()
     {
+        if (LevelFlow.Current != null) return;   // LevelRuntime shows the level result
         var gs = GameState.I;
         StartCoroutine(gs.Combat ? DiedScreen() : FlappyScreen());
     }
 
-    void OnWon() { StartCoroutine(WinScreen()); }
+    void OnWon() { if (LevelFlow.Current == null) StartCoroutine(WinScreen()); }
 
     Transform NewScreen(float dim)
     {

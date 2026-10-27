@@ -37,20 +37,21 @@ public class BossDirector : MonoBehaviour
     {
         foreach (var b in bosses) if (b) b.gameObject.SetActive(false);
         var gs = GameState.I;
-        if (gs != null && gs.FromCheckpoint)
+        if (gs != null && (gs.FromCheckpoint || GameState.Mode == RunMode.BossRush))
         {
             FilmFilter.IrisSet(0f);
             StopBirds();
             gs.EnterCombat();
             running = true;
-            StartCoroutine(Gauntlet(Mathf.Clamp(gs.BossIndex, 0, bosses.Length - 1)));
+            int start = GameState.OnlyBoss >= 0 ? GameState.OnlyBoss : gs.BossIndex;
+            StartCoroutine(Gauntlet(Mathf.Clamp(start, 0, bosses.Length - 1)));
         }
     }
 
     void OnScore(int s)
     {
         var gs = GameState.I;
-        if (running || gs == null || gs.Combat || s < GameState.CombatScore) return;
+        if (running || gs == null || gs.Combat || s < GameState.CombatScore || GameState.Mode == RunMode.Flappy) return;
         running = true;
         StartCoroutine(ToCombat());
     }
@@ -78,7 +79,8 @@ public class BossDirector : MonoBehaviour
     IEnumerator Gauntlet(int start)
     {
         var gs = GameState.I;
-        for (int i = start; i < bosses.Length; i++)
+        int end = GameState.OnlyBoss >= 0 ? Mathf.Min(GameState.OnlyBoss + 1, bosses.Length) : bosses.Length;
+        for (int i = start; i < end; i++)
         {
             var boss = bosses[i];
             gs.SetBoss(i, 0);

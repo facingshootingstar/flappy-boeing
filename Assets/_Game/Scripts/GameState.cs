@@ -5,7 +5,10 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// Run state. Score 0-29 is the Flappy phase; at 30 the BossDirector takes over (WASD + shoot gauntlet of 3 bosses x 3 phases).
 /// A checkpoint survives scene reloads so the death screen can retry the current boss.
+/// <see cref="Mode"/> picks Classic (Flappy then bosses), endless Flappy, or Boss Rush only.
 /// </summary>
+public enum RunMode { Classic, Flappy, BossRush }
+
 public class GameState : MonoBehaviour
 {
     public static GameState I { get; private set; }
@@ -21,9 +24,12 @@ public class GameState : MonoBehaviour
     public static int CheckpointBoss = -1;
     static int checkpointScore;
     public static bool God;   // debug only (AutoPilot)
+    public static RunMode Mode = RunMode.Classic;
+    /// <summary>Boss level: fight only this boss (-1 = whole gauntlet). Set by LevelRuntime.</summary>
+    public static int OnlyBoss = -1;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { CheckpointBoss = -1; checkpointScore = 0; God = false; ScoreChanged = null; Died = null; Won = null; CombatStarted = null; }
+    static void ResetStatics() { CheckpointBoss = -1; checkpointScore = 0; God = false; Mode = RunMode.Classic; OnlyBoss = -1; ScoreChanged = null; Died = null; Won = null; CombatStarted = null; }
 
     public int Score { get; private set; }
     public bool Alive { get; private set; } = true;
@@ -43,18 +49,28 @@ public class GameState : MonoBehaviour
     void Awake()
     {
         I = this;
-        Best = PlayerPrefs.GetInt("best", 0);
+        Best = SaveSystem.Data.bestFlappy;
         if (CheckpointBoss >= 0) { FromCheckpoint = true; Score = checkpointScore; BossIndex = CheckpointBoss; }
     }
 
     void Start()
     {
-        if (!FromCheckpoint) AudioManager.Music("music_flappy", 0.5f);
+        // Backup for a sceneLoaded that skipped Ensure. Awake is too early: it hides roots before they start.
+        LevelRuntime.Ensure();
+        if (!FromCheckpoint && Mode != RunMode.BossRush) AudioManager.Music("music_flappy", 0.5f);
     }
 
     void OnDestroy() { if (I == this) I = null; }
 
-    void Update() { if (Combat && Alive) FightTime += Time.deltaTime; }
+    void Update()
+    {
+        if (Combat && Alive) FightTime += Time.deltaTime;
+        if (!Started && !Combat)
+        {
+            int m = CombatInput.ModeKey();
+            if (m > 0 && LevelFlow.Current == null) LevelFlow.FreePlay((RunMode)(m - 1));
+        }
+    }
 
     public void Begin() { Started = true; }
 
@@ -86,8 +102,39 @@ public class GameState : MonoBehaviour
         Victory = true;
         Alive = false;
         CheckpointBoss = -1;
-        if (Score > Best) { Best = Score; PlayerPrefs.SetInt("best", Best); }
+        RecordBest();
+        GrantRun(true);
         Won?.Invoke();
+    }
+
+    /// <summary>Last run's payout (coins/xp already saved). Null until a run ends.</summary>
+    public RunResult LastResult { get; private set; }
+
+    void GrantRun(bool won)
+    {
+        float t = Time.timeSinceLevelLoad;
+        if (!Combat)
+        {
+            LastResult = Economy.Grant(RunResult.Create("flappy", Score, won, t));
+        }
+        else
+        {
+            // boss runs score by phases cleared (pipes don't count in combat); Classic also pays its Flappy leg
+            int phases = OnlyBoss >= 0 ? (won ? PhasesPerBoss : BossPhase)
+                       : won ? BossCount * PhasesPerBoss : BossIndex * PhasesPerBoss + BossPhase;
+            int flappyCoins = Mode == RunMode.Classic ? Economy.Grant(RunResult.Create("flappy", Score, false, t)).coinsEarned : 0;
+            LastResult = Economy.Grant(RunResult.Create("bossrush", phases, won, t));
+            LastResult.coinsEarned += flappyCoins;
+        }
+        Debug.Log($"[Economy] {LastResult.gameId} score={LastResult.score} won={won} +{LastResult.coinsEarned} coins (total {SaveSystem.Data.coins})");
+    }
+
+    void RecordBest()
+    {
+        if (Mode == RunMode.BossRush || Score <= Best) return;
+        Best = Score;
+        SaveSystem.Data.bestFlappy = Best;
+        SaveSystem.Save();
     }
 
     public void Add(int n = 1)
@@ -102,7 +149,8 @@ public class GameState : MonoBehaviour
     {
         if (!Alive || God) return;
         Alive = false;
-        if (Score > Best) { Best = Score; PlayerPrefs.SetInt("best", Best); }
+        RecordBest();
+        GrantRun(false);
         Died?.Invoke();
     }
 
