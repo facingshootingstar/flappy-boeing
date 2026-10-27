@@ -4,6 +4,7 @@ using UnityEngine;
 /// <summary>
 /// Boot screen. PLAY opens the mail map, RANKING reads saved level records, OPTIONS is music and sfx, EXIT quits.
 /// Labels stay in the pixel font. Art is Imagine sprites when those files exist.
+/// The corner button signs in with Google only to greet the player by name.
 /// </summary>
 public class FrontMenu : MonoBehaviour
 {
@@ -11,7 +12,7 @@ public class FrontMenu : MonoBehaviour
 
     Transform root, panel;
     Ui.Button[] btns;
-    Ui.Button backBtn, optMusic, optSfx;
+    Ui.Button backBtn, optMusic, optSfx, googleBtn;
     int sel;
     float lockUntil;
     Transform poeT;
@@ -44,8 +45,29 @@ public class FrontMenu : MonoBehaviour
             btns[i] = Ui.Btn(root, Labels[i], new Vector2(2.15f, 1.15f - i * 0.95f), new Vector2(4.4f, 0.78f),
                 Announcer.Cream, Order + 8);
         Ui.Txt(root, "W/S: MOVE   SPACE: OK", new Vector2(2.15f, -3.55f), 0.58f, Announcer.Cream, Order + 8);
+        if (GoogleLogin.Available)
+        {
+            googleBtn = Ui.Btn(root, GoogleLabel(), new Vector2(-4.9f, 3.6f), new Vector2(4.6f, 0.62f),
+                Announcer.Cream, Order + 8);
+            googleBtn.label.transform.localScale = Vector3.one * 0.62f;
+            if (!GoogleLogin.SignedIn) GoogleLogin.TrySilent(_ => RefreshGoogle());
+        }
         AudioManager.Music("music_flappy", 0.6f);
         Paint();
+    }
+
+    static string GoogleLabel() => GoogleLogin.SignedIn ? "HI " + GoogleLogin.Name : "SIGN IN WITH GOOGLE";
+
+    void RefreshGoogle()
+    {
+        if (googleBtn != null && googleBtn.label) googleBtn.label.Text = GoogleLabel();
+    }
+
+    void PressGoogle()
+    {
+        AudioManager.Sfx("card", 0.5f);
+        if (GoogleLogin.SignedIn) return;
+        GoogleLogin.SignIn(_ => RefreshGoogle());
     }
 
     void Update()
@@ -57,7 +79,8 @@ public class FrontMenu : MonoBehaviour
         if (UiInput.Confirm()) Activate(sel);
         else if (UiInput.Up(out var p))
         {
-            for (int i = 0; i < btns.Length; i++)
+            if (googleBtn != null && googleBtn.Hit(p)) PressGoogle();
+            else for (int i = 0; i < btns.Length; i++)
                 if (btns[i].Hit(p)) { sel = i; Activate(i); break; }
         }
         Paint();
