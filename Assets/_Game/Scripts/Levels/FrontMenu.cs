@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>
 /// Boot screen. PLAY opens the mail map, RANKING reads saved level records, OPTIONS is music and sfx, EXIT quits.
 /// Labels stay in the pixel font. Art is Imagine sprites when those files exist.
-/// The corner button opens local sign-in (name + password, see <see cref="Accounts"/>) to greet the player by name.
+/// Only reachable after <see cref="LoginScreen"/>. The corner button shows HI NAME and opens the account panel with LOG OUT.
 /// </summary>
 public class FrontMenu : MonoBehaviour
 {
@@ -13,11 +13,9 @@ public class FrontMenu : MonoBehaviour
     Transform root, panel;
     Ui.Button[] btns;
     Ui.Button backBtn, optMusic, optSfx, accountBtn;
-    Ui.Button nameBox, passBox, loginBtn, signupBtn, logoutBtn;
-    PixelText msgTxt;
-    string nameIn = "", passIn = "";
-    int field;
-    TouchScreenKeyboard kb;
+    Ui.Button logoutBtn;
+    MenuIntro intro;
+    readonly List<BtnFx> fx = new List<BtnFx>();
     int sel;
     float lockUntil;
     Transform poeT;
@@ -32,6 +30,8 @@ public class FrontMenu : MonoBehaviour
         if (hangar) Ui.Spr("Hangar", root, hangar, Vector2.zero, Order);
         else Ui.Box("Hangar", root, Vector2.zero, new Vector2(16f, 10f), new Color32(42, 36, 48, 255), Order);
 
+        MenuSky.Build(root, Order + 1, 0.35f, 0.8f, 3.9f);
+        intro = new MenuIntro();
         var poe = PropArt.Imagen("poe", 2.8f);
         if (poe)
         {
@@ -41,26 +41,35 @@ public class FrontMenu : MonoBehaviour
         var pilot = PropArt.Imagen("pilot_idle", 2.35f);
         if (pilot) Ui.Spr("Pilot", root, pilot, new Vector2(-1.55f, -1.05f), Order + 5);
 
-        Ui.Txt(root, CutsceneDB.Title, new Vector2(2.15f, 2.85f), 0.72f, Announcer.Yellow, Order + 8,
+        var title = Ui.Txt(root, CutsceneDB.Title, new Vector2(2.15f, 2.85f), 0.72f, Announcer.Yellow, Order + 8,
             PixelText.Align.Center, PixelText.Effect.Boil);
-        Ui.Txt(root, "THE MAIL STILL FLIES", new Vector2(2.15f, 2.15f), 0.62f, Announcer.Cream, Order + 8);
+        var tag = Ui.Txt(root, "THE MAIL STILL FLIES", new Vector2(2.15f, 2.15f), 0.62f, Announcer.Cream, Order + 8);
+        intro.Add(title.transform, new Vector2(0f, 6f), 0f, 0.9f, true);
+        intro.Add(tag.transform, new Vector2(9f, 0f), 0.5f, 0.5f);
 
         btns = new Ui.Button[Labels.Length];
         for (int i = 0; i < Labels.Length; i++)
             btns[i] = Ui.Btn(root, Labels[i], new Vector2(2.15f, 1.15f - i * 0.95f), new Vector2(4.4f, 0.78f),
                 Announcer.Cream, Order + 8);
-        Ui.Txt(root, "W/S: MOVE   SPACE: OK", new Vector2(2.15f, -3.55f), 0.58f, Announcer.Cream, Order + 8);
+        for (int i = 0; i < btns.Length; i++) intro.Add(btns[i], new Vector2(9f, 0f), 0.6f + i * 0.12f);
+        var hint = Ui.Txt(root, "W/S: MOVE   SPACE: OK", new Vector2(2.15f, -3.55f), 0.58f, Announcer.Cream, Order + 8);
+        intro.Add(hint.transform, new Vector2(0f, -3f), 1.1f, 0.4f);
         accountBtn = Ui.Btn(root, AccountLabel(), new Vector2(-4.9f, 3.6f), new Vector2(4.6f, 0.62f),
             Announcer.Cream, Order + 8);
         accountBtn.label.transform.localScale = Vector3.one * 0.62f;
+        intro.Add(accountBtn, new Vector2(-9f, 0f), 1.0f);
+        foreach (var b in btns) fx.Add(new BtnFx(b));
+        fx.Add(new BtnFx(accountBtn));
         AudioManager.Music("music_flappy", 0.6f);
         Paint();
     }
 
-    static string AccountLabel() => Accounts.SignedIn ? "HI " + Accounts.Current : "LOG IN";
+    static string AccountLabel() => "HI " + Accounts.Current;
 
     void Update()
     {
+        intro.Tick();
+        BtnFx.TickAll(fx, panel ? -1 : sel);
         if (poeT) poeT.localPosition = poeHome + new Vector3(0f, Mathf.Sin(Time.unscaledTime * 2.2f) * 0.08f, 0f);
         if (panel) { PanelInput(); return; }
         if (UiInput.UpDown()) Move(-1);
@@ -111,6 +120,7 @@ public class FrontMenu : MonoBehaviour
         ClosePanel();
         lockUntil = Time.unscaledTime + 0.18f;
         panel = Ui.Root("Rank", root);
+        PanelPop.On(panel);
         var dim = Ui.Ink; dim.a = 0.62f;
         Ui.Box("Dim", panel, Vector2.zero, new Vector2(20f, 12f), dim, Order + 20);
         Ui.Plaque(panel, new Vector2(0f, -0.15f), new Vector2(10.2f, 6.6f), Order + 21);
@@ -148,6 +158,7 @@ public class FrontMenu : MonoBehaviour
         ClosePanel();
         lockUntil = Time.unscaledTime + 0.18f;
         panel = Ui.Root("Options", root);
+        PanelPop.On(panel);
         var dim = Ui.Ink; dim.a = 0.62f;
         Ui.Box("Dim", panel, Vector2.zero, new Vector2(20f, 12f), dim, Order + 20);
         Ui.Plaque(panel, new Vector2(0f, -0.1f), new Vector2(8f, 5.2f), Order + 21);
@@ -159,118 +170,36 @@ public class FrontMenu : MonoBehaviour
         backBtn = Ui.Btn(panel, "BACK", new Vector2(0f, -1.7f), new Vector2(2.6f, 0.7f), Announcer.Cream, Order + 22);
     }
 
-    /// <summary>Signed out: name and password fields with LOG IN / SIGN UP. Signed in: the name and LOG OUT.</summary>
+    /// <summary>Signed-in name and LOG OUT (which returns to the login screen).</summary>
     void OpenAccount()
     {
         ClosePanel();
         lockUntil = Time.unscaledTime + 0.18f;
         panel = Ui.Root("Account", root);
+        PanelPop.On(panel);
         var dim = Ui.Ink; dim.a = 0.62f;
         Ui.Box("Dim", panel, Vector2.zero, new Vector2(20f, 12f), dim, Order + 20);
-        Ui.Plaque(panel, new Vector2(0f, -0.15f), new Vector2(8.6f, 5.8f), Order + 21);
-        if (Accounts.SignedIn)
-        {
-            Ui.Txt(panel, "ACCOUNT", new Vector2(0f, 2.05f), 1.3f, Announcer.Yellow, Order + 22, PixelText.Align.Center, PixelText.Effect.Boil);
-            Ui.Txt(panel, "SIGNED IN AS", new Vector2(0f, 1.05f), 0.7f, Announcer.Cream, Order + 22);
-            Ui.Txt(panel, Accounts.Current, new Vector2(0f, 0.4f), 1.1f, Announcer.Teal, Order + 22);
-            logoutBtn = Ui.Btn(panel, "LOG OUT", new Vector2(0f, -0.85f), new Vector2(3.6f, 0.75f), Announcer.Cream, Order + 22);
-        }
-        else
-        {
-            Ui.Txt(panel, "LOG IN", new Vector2(0f, 2.05f), 1.3f, Announcer.Yellow, Order + 22, PixelText.Align.Center, PixelText.Effect.Boil);
-            Ui.Txt(panel, "NAME", new Vector2(-3.65f, 1.0f), 0.7f, Announcer.Cream, Order + 22, PixelText.Align.Left);
-            Ui.Txt(panel, "PASS", new Vector2(-3.65f, 0.05f), 0.7f, Announcer.Cream, Order + 22, PixelText.Align.Left);
-            nameBox = Ui.Btn(panel, "", new Vector2(0.75f, 1.0f), new Vector2(5.2f, 0.72f), Announcer.Cream, Order + 22);
-            passBox = Ui.Btn(panel, "", new Vector2(0.75f, 0.05f), new Vector2(5.2f, 0.72f), Announcer.Cream, Order + 22);
-            nameBox.label.transform.localScale = passBox.label.transform.localScale = Vector3.one * 0.8f;
-            msgTxt = Ui.Txt(panel, "", new Vector2(0f, -0.75f), 0.62f, Announcer.Red, Order + 22);
-            loginBtn = Ui.Btn(panel, "LOG IN", new Vector2(-1.9f, -1.6f), new Vector2(3.4f, 0.75f), Announcer.Cream, Order + 22);
-            signupBtn = Ui.Btn(panel, "SIGN UP", new Vector2(1.9f, -1.6f), new Vector2(3.4f, 0.75f), Announcer.Cream, Order + 22);
-            field = 0;
-            UiInput.Typed();
-            PaintFields();
-        }
-        backBtn = Ui.Btn(panel, "BACK", new Vector2(0f, -2.5f), new Vector2(2.6f, 0.65f), Announcer.Cream, Order + 22);
+        Ui.Plaque(panel, new Vector2(0f, -0.15f), new Vector2(8.6f, 4.8f), Order + 21);
+        Ui.Txt(panel, "ACCOUNT", new Vector2(0f, 1.6f), 1.3f, Announcer.Yellow, Order + 22, PixelText.Align.Center, PixelText.Effect.Boil);
+        Ui.Txt(panel, "SIGNED IN AS", new Vector2(0f, 0.65f), 0.7f, Announcer.Cream, Order + 22);
+        Ui.Txt(panel, Accounts.Current, new Vector2(0f, 0.05f), 1.1f, Announcer.Teal, Order + 22);
+        logoutBtn = Ui.Btn(panel, "LOG OUT", new Vector2(0f, -0.95f), new Vector2(3.6f, 0.75f), Announcer.Cream, Order + 22);
+        backBtn = Ui.Btn(panel, "BACK", new Vector2(0f, -1.85f), new Vector2(2.6f, 0.65f), Announcer.Cream, Order + 22);
     }
 
     void AccountInput()
     {
         if (UiInput.Escape()) { AudioManager.Sfx("card", 0.4f); ClosePanel(); return; }
-        if (nameBox != null)
-        {
-            foreach (char c in UiInput.Typed()) AddChar(c);
-            if (kb != null)
-            {
-                if (field == 0) { nameIn = ""; foreach (char c in kb.text) AddChar(c); }
-                else passIn = kb.text.Length > Accounts.PassMax ? kb.text.Substring(0, Accounts.PassMax) : kb.text;
-                if (kb.status != TouchScreenKeyboard.Status.Visible) kb = null;
-            }
-            if (UiInput.Erase())
-            {
-                if (field == 0 && nameIn.Length > 0) nameIn = nameIn.Substring(0, nameIn.Length - 1);
-                if (field == 1 && passIn.Length > 0) passIn = passIn.Substring(0, passIn.Length - 1);
-            }
-            if (UiInput.Tab()) field = 1 - field;
-            if (UiInput.Enter()) { if (field == 0) field = 1; else Submit(false); }
-            if (nameBox != null) PaintFields();
-        }
         if (!UiInput.Up(out var p)) return;
-        if (nameBox != null && nameBox.Hit(p)) Focus(0);
-        else if (passBox != null && passBox.Hit(p)) Focus(1);
-        else if (loginBtn != null && loginBtn.Hit(p)) Submit(false);
-        else if (signupBtn != null && signupBtn.Hit(p)) Submit(true);
-        else if (logoutBtn != null && logoutBtn.Hit(p))
+        if (logoutBtn != null && logoutBtn.Hit(p))
         {
             Accounts.SignOut();
             AudioManager.Sfx("card", 0.5f);
-            accountBtn.label.Text = AccountLabel();
-            OpenAccount();
+            if (root) Destroy(root.gameObject);
+            gameObject.AddComponent<LoginScreen>();
+            Destroy(this);
         }
         else if (backBtn != null && backBtn.Hit(p)) { AudioManager.Sfx("card", 0.4f); ClosePanel(); }
-    }
-
-    /// <summary>Names keep to A-Z and 0-9; passwords take any printable character.</summary>
-    void AddChar(char c)
-    {
-        if (c < ' ' || c == (char)127) return;
-        if (field == 0)
-        {
-            c = char.ToUpperInvariant(c);
-            if (nameIn.Length < Accounts.NameMax && ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) nameIn += c;
-        }
-        else if (passIn.Length < Accounts.PassMax) passIn += c;
-    }
-
-    void Focus(int f)
-    {
-        field = f;
-        if (TouchScreenKeyboard.isSupported)
-            kb = TouchScreenKeyboard.Open(f == 0 ? nameIn : passIn, TouchScreenKeyboardType.Default, false, false, f == 1);
-    }
-
-    void Submit(bool create)
-    {
-        string err = create ? Accounts.Register(nameIn, passIn) : Accounts.SignIn(nameIn, passIn);
-        if (err != null)
-        {
-            AudioManager.Sfx("card", 0.5f);
-            msgTxt.Text = err;
-            if (!create) passIn = "";
-            return;
-        }
-        AudioManager.Sfx("ready", 0.55f);
-        accountBtn.label.Text = AccountLabel();
-        ClosePanel();
-    }
-
-    /// <summary>Password shows as + marks (the pixel font has no asterisk); the active field gets a blinking caret.</summary>
-    void PaintFields()
-    {
-        bool blink = Mathf.Repeat(Time.unscaledTime, 1f) < 0.5f;
-        nameBox.label.Text = nameIn + (field == 0 && blink ? "-" : "");
-        passBox.label.Text = new string('+', passIn.Length) + (field == 1 && blink ? "-" : "");
-        nameBox.label.SetColor(field == 0 ? Announcer.Yellow : Announcer.Cream);
-        passBox.label.SetColor(field == 1 ? Announcer.Yellow : Announcer.Cream);
     }
 
     void ClosePanel()
@@ -278,10 +207,7 @@ public class FrontMenu : MonoBehaviour
         if (panel) Destroy(panel.gameObject);
         panel = null;
         backBtn = optMusic = optSfx = null;
-        nameBox = passBox = loginBtn = signupBtn = logoutBtn = null;
-        msgTxt = null;
-        nameIn = passIn = "";
-        if (kb != null) { kb.active = false; kb = null; }
+        logoutBtn = null;
     }
 
     void PanelInput()

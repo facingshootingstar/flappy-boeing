@@ -1,32 +1,52 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Security.Cryptography;
+using System.Text;
 using UnityEngine;
+using UnityEngine.Networking;
 
 /// <summary>
-/// Local accounts: name + password, kept in accounts.json on this device only. Used to greet the player
-/// by name. Passwords are never stored, only a salted PBKDF2 hash. The last signed-in name is remembered.
+/// Firebase Auth over its REST API (no SDK). A name becomes the email name@flappyboeing.app. Only
+/// {current, uid, refreshToken} is kept in accounts.json; the password is never stored. The API key comes from
+/// Resources/firebase.json (git-ignored, see firebase.example.json). All calls report back through a callback
+/// with an error line (short, uppercase, pixel-font safe) or null on success.
 /// </summary>
 public static class Accounts
 {
-    public const int NameMin = 3, NameMax = 12, PassMin = 4, PassMax = 24;
-    const int Iterations = 20000, HashBytes = 32, SaltBytes = 16;
+    public const int NameMin = 3, NameMax = 12, PassMin = 6, PassMax = 24;
+    const string Domain = "@flappyboeing.app";
+    const string AuthUrl = "https://identitytoolkit.googleapis.com/v1/accounts:";
+    const string TokenUrl = "https://securetoken.googleapis.com/v1/token";
 
-    [Serializable] class Entry { public string name, salt, hash; }
-    [Serializable] class Store { public string current = ""; public List<Entry> users = new List<Entry>(); }
+    [Serializable] class Store { public string current = "", uid = "", refreshToken = ""; }
+    [Serializable] class KeyFile { public string apiKey = ""; }
+    [Serializable] class Req { public string email, password; public bool returnSecureToken = true; }
+    [Serializable] class Resp { public string localId, refreshToken, refresh_token, user_id; }
+    [Serializable] class ErrBody { public ErrInner error; }
+    [Serializable] class ErrInner { public string message; }
 
     static Store store;
+    static string apiKey;
+    static bool keyLoaded;
 
     static string FilePath => Path.Combine(Application.persistentDataPath, "accounts.json");
     static string TempPath => FilePath + ".tmp";
 
+    /// <summary>True once Firebase accepted a sign-in or a token refresh during this run. The menu waits for it.</summary>
+    public static bool Verified { get; private set; }
+    public static bool Busy { get; private set; }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { store = null; }
+    static void ResetStatics() { store = null; apiKey = null; keyLoaded = false; Verified = false; Busy = false; }
 
     /// <summary>Signed-in name, or empty.</summary>
-    public static string Current { get { Load(); return store.current; } }
-    public static bool SignedIn => Current.Length > 0;
+    public static string Current { get { Load(); return Verified ? store.current : ""; } }
+    public static string Uid { get { Load(); return store.uid; } }
+    public static bool SignedIn => Verified && Current.Length > 0;
+    /// <summary>A refresh token from an earlier run is stored (not yet checked with Firebase).</summary>
+    public static bool HasSession { get { Load(); return store.refreshToken.Length > 0 && store.current.Length > 0; } }
+    public static string SavedName { get { Load(); return store.current; } }
+
+    public static bool KeyMissing { get { LoadKey(); return string.IsNullOrEmpty(apiKey); } }
 
     /// <summary>Name rule: letters and digits only, so it always draws in the pixel font.</summary>
     public static string CheckName(string name)
@@ -45,54 +65,128 @@ public static class Accounts
         return null;
     }
 
-    /// <summary>Creates the account and signs in. Returns an error line, or null on success.</summary>
-    public static string Register(string name, string pass)
-    {
-        string err = CheckName(name) ?? CheckPass(pass);
-        if (err != null) return err;
-        Load();
-        if (Find(name) != null) return "NAME ALREADY TAKEN";
-        var salt = new byte[SaltBytes];
-        using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(salt);
-        store.users.Add(new Entry { name = name, salt = Convert.ToBase64String(salt), hash = Convert.ToBase64String(Hash(pass, salt)) });
-        store.current = name;
-        Save();
-        return null;
-    }
+    public static string EmailFor(string name) => name.ToLowerInvariant() + Domain;
 
-    /// <summary>Signs in. Returns an error line, or null on success.</summary>
-    public static string SignIn(string name, string pass)
-    {
-        Load();
-        var e = Find(name);
-        if (e == null || !Same(Hash(pass, Convert.FromBase64String(e.salt)), Convert.FromBase64String(e.hash)))
-            return "WRONG NAME OR PASSWORD";
-        store.current = name;
-        Save();
-        return null;
-    }
+    public static void Register(string name, string pass, Action<string> done) => Auth("signUp", name, pass, done);
+    public static void SignIn(string name, string pass, Action<string> done) => Auth("signInWithPassword", name, pass, done);
 
     public static void SignOut()
     {
         Load();
-        store.current = "";
+        Verified = false;
+        store.current = store.uid = store.refreshToken = "";
         Save();
     }
 
-    static Entry Find(string name) => store.users.Find(u => u.name == name);
-
-    static byte[] Hash(string pass, byte[] salt)
+    /// <summary>Checks the stored refresh token with Firebase. An expired or revoked token is dropped quietly.</summary>
+    public static void Restore(Action<string> done)
     {
-        using (var kdf = new Rfc2898DeriveBytes(pass, salt, Iterations, HashAlgorithmName.SHA256))
-            return kdf.GetBytes(HashBytes);
+        Load();
+        if (!HasSession) { done?.Invoke("NO SESSION"); return; }
+        if (KeyMissing) { done?.Invoke("FIREBASE KEY MISSING"); return; }
+        string body = "grant_type=refresh_token&refresh_token=" + UnityWebRequest.EscapeURL(store.refreshToken);
+        Send(TokenUrl + "?key=" + apiKey, Encoding.UTF8.GetBytes(body), "application/x-www-form-urlencoded", (resp, err) =>
+        {
+            if (err != null)
+            {
+                if (err == "SESSION EXPIRED") { store.refreshToken = store.uid = store.current = ""; Save(); }
+                done?.Invoke(err);
+                return;
+            }
+            store.refreshToken = string.IsNullOrEmpty(resp.refresh_token) ? store.refreshToken : resp.refresh_token;
+            if (!string.IsNullOrEmpty(resp.user_id)) store.uid = resp.user_id;
+            Verified = true;
+            Save();
+            done?.Invoke(null);
+        });
     }
 
-    static bool Same(byte[] a, byte[] b)
+    static void Auth(string endpoint, string name, string pass, Action<string> done)
     {
-        if (a.Length != b.Length) return false;
-        int diff = 0;
-        for (int i = 0; i < a.Length; i++) diff |= a[i] ^ b[i];
-        return diff == 0;
+        string err = CheckName(name) ?? CheckPass(pass);
+        if (err != null) { done?.Invoke(err); return; }
+        if (KeyMissing) { done?.Invoke("FIREBASE KEY MISSING"); return; }
+        if (Busy) return;
+        var json = JsonUtility.ToJson(new Req { email = EmailFor(name), password = pass });
+        Send(AuthUrl + endpoint + "?key=" + apiKey, Encoding.UTF8.GetBytes(json), "application/json", (resp, e) =>
+        {
+            if (e != null) { done?.Invoke(e); return; }
+            Load();
+            store.current = name;
+            store.uid = resp.localId ?? "";
+            store.refreshToken = resp.refreshToken ?? "";
+            Verified = true;
+            Save();
+            done?.Invoke(null);
+        });
+    }
+
+    static void Send(string url, byte[] body, string contentType, Action<Resp, string> cb)
+    {
+        Busy = true;
+        var req = new UnityWebRequest(url, "POST")
+        {
+            uploadHandler = new UploadHandlerRaw(body) { contentType = contentType },
+            downloadHandler = new DownloadHandlerBuffer(),
+            timeout = 15
+        };
+        req.SendWebRequest().completed += _ =>
+        {
+            Busy = false;
+            string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+            var result = req.result;
+            req.Dispose();
+            if (result == UnityWebRequest.Result.Success)
+            {
+                Resp r = null;
+                try { r = JsonUtility.FromJson<Resp>(text); } catch (Exception) { }
+                cb(r ?? new Resp(), null);
+            }
+            else cb(null, result == UnityWebRequest.Result.ProtocolError ? MapError(text) : "NO CONNECTION");
+        };
+    }
+
+    /// <summary>Firebase error text ("WEAK_PASSWORD : ...") to a short line for the pixel font.</summary>
+    public static string MapError(string body)
+    {
+        string code = "";
+        try { code = JsonUtility.FromJson<ErrBody>(body)?.error?.message ?? ""; } catch (Exception) { }
+        int cut = code.IndexOf(' ');
+        if (cut > 0) code = code.Substring(0, cut);
+        switch (code)
+        {
+            case "EMAIL_EXISTS": return "NAME ALREADY TAKEN";
+            case "INVALID_LOGIN_CREDENTIALS":
+            case "EMAIL_NOT_FOUND":
+            case "INVALID_PASSWORD": return "WRONG NAME OR PASSWORD";
+            case "WEAK_PASSWORD": return "PASSWORD TOO WEAK";
+            case "TOO_MANY_ATTEMPTS_TRY_LATER": return "TOO MANY TRIES";
+            case "USER_DISABLED": return "ACCOUNT DISABLED";
+            case "OPERATION_NOT_ALLOWED":
+            case "CONFIGURATION_NOT_FOUND": return "EMAIL LOGIN IS OFF";
+            case "TOKEN_EXPIRED":
+            case "INVALID_REFRESH_TOKEN":
+            case "USER_NOT_FOUND": return "SESSION EXPIRED";
+        }
+        if (code.StartsWith("API_KEY") || code.StartsWith("INVALID_API_KEY") || body.Contains("API key not valid")) return "BAD FIREBASE KEY";
+        return "LOGIN FAILED";
+    }
+
+    static void LoadKey()
+    {
+        if (keyLoaded) return;
+        keyLoaded = true;
+        try
+        {
+            // Resources works on every platform (WebGL/Android can't File-read StreamingAssets); the
+            // StreamingAssets copy is kept as a desktop fallback for older setups.
+            var res = Resources.Load<TextAsset>("firebase");
+            string json = res != null ? res.text : null;
+            string p = Path.Combine(Application.streamingAssetsPath, "firebase.json");
+            if (json == null && File.Exists(p)) json = File.ReadAllText(p);
+            if (json != null) apiKey = (JsonUtility.FromJson<KeyFile>(json)?.apiKey ?? "").Trim();
+        }
+        catch (Exception e) { Debug.LogWarning("[Accounts] could not read firebase.json: " + e.Message); }
     }
 
     static void Load()
@@ -101,9 +195,7 @@ public static class Accounts
         try { store = File.Exists(FilePath) ? JsonUtility.FromJson<Store>(File.ReadAllText(FilePath)) : null; }
         catch (Exception e) { Debug.LogWarning("[Accounts] could not read accounts: " + e.Message); }
         store ??= new Store();
-        store.users ??= new List<Entry>();
-        store.current ??= "";
-        if (store.current.Length > 0 && Find(store.current) == null) store.current = "";
+        store.current ??= ""; store.uid ??= ""; store.refreshToken ??= "";
     }
 
     static void Save()
@@ -121,7 +213,11 @@ public static class Accounts
     static void SelfCheck()
     {
         bool ok = CheckName("POE") == null && CheckName("AB") != null && CheckName("POE 1") != null
-            && CheckName("ABCDEFGHIJKLM") != null && CheckPass("abc") != null && CheckPass("abcd") == null;
-        if (!ok) Debug.LogError("[Accounts] name/password rules failed");
+            && CheckName("ABCDEFGHIJKLM") != null && CheckPass("abc") != null && CheckPass("abcdef") == null
+            && EmailFor("PoE") == "poe@flappyboeing.app"
+            && MapError("{\"error\":{\"message\":\"EMAIL_EXISTS\"}}") == "NAME ALREADY TAKEN"
+            && MapError("{\"error\":{\"message\":\"WEAK_PASSWORD : x\"}}") == "PASSWORD TOO WEAK"
+            && MapError("{\"error\":{\"message\":\"INVALID_LOGIN_CREDENTIALS\"}}") == "WRONG NAME OR PASSWORD";
+        if (!ok) Debug.LogError("[Accounts] self check failed");
     }
 }

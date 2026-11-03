@@ -345,7 +345,9 @@ public class LevelRuntime : MonoBehaviour
     {
         HideShell();
         FilmFilter.IrisSet(FilmFilter.IrisOpenRadius);
-        if (!GetComponent<FrontMenu>()) gameObject.AddComponent<FrontMenu>();
+        if (GetComponent<FrontMenu>() || GetComponent<LoginScreen>()) return;
+        if (Accounts.SignedIn) gameObject.AddComponent<FrontMenu>();
+        else gameObject.AddComponent<LoginScreen>();
     }
 
     public void OpenMap()

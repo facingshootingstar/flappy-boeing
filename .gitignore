@@ -16,3 +16,12 @@
 __pycache__/
 *.pyc
 .env
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# Firebase Web API key (copy StreamingAssets/firebase.example.json to Resources/firebase.json)
+/Assets/StreamingAssets/firebase.json
+/Assets/StreamingAssets/firebase.json.meta
+/Assets/Resources/firebase.json
+/Assets/Resources/firebase.json.meta
